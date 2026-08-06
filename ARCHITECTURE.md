@@ -71,7 +71,7 @@ sequenceDiagram
   B->>SG: load UI (no session)
   SG->>IDP: 302 authorize (code + PKCE)
   IDP-->>SG: id_token (confidential RP)
-  Note over SG,IDP: OPTIONAL: elevate id_token → per-user,<br/>session-scoped API credential (trusted client;<br/>server-side only; off by default — SPEC §3.4)
+  Note over SG,IDP: OPTIONAL — elevate id_token into a per-user,<br/>session-scoped API credential. Trusted client only,<br/>server-side only, off by default (SPEC 3.4)
   SG-->>B: serve UI + inject short-lived, grant-bearing view token
   B->>SG: data call (Bearer view token, service + path)
   SG->>SG: verify token + aud → scope ∋ service → grant allows
@@ -79,6 +79,42 @@ sequenceDiagram
   P-->>SG: 200 — authorized AS THE VIEWER
   SG-->>B: 200 passthrough
 ```
+
+## The two access tiers (what "optional" means in practice)
+
+Baseline is **pure OIDC identity**. API-key-based backend access is an **opt-in add-on**
+(SPEC §3.4, §6.0) — enable it only for scopes whose Data Source requires an API credential.
+
+```mermaid
+flowchart TB
+  L["Viewer completes OIDC login"]
+  Q{"Backend credential<br/>provisioning enabled?"}
+
+  subgraph T1["Tier 1 — identity-only (DEFAULT)"]
+    direction TB
+    A1["No API key is ever minted"]
+    A2["UI is served, viewer identity known"]
+    A3["Data Sources reachable via<br/>hub-relayed identity"]
+    A4["Calls needing an API credential<br/>are refused, with a reason"]
+  end
+
+  subgraph T2["Tier 2 — API-key backend access (OPT-IN)"]
+    direction TB
+    B1["Trusted client exchanges id_token<br/>for a per-user, session-scoped API key"]
+    B2["Key stored server-side only —<br/>never in the browser, page, or logs"]
+    B3["Data calls forwarded with the<br/>viewer's own API key"]
+    B4["Data Source re-authorizes per user.<br/>The grant is a ceiling, not a bypass"]
+  end
+
+  L --> Q
+  Q -->|"no (default)"| T1
+  Q -->|"yes"| T2
+  A1 --> A2 --> A3 --> A4
+  B1 --> B2 --> B3 --> B4
+```
+
+Both tiers keep the same invariant: the browser holds only the short-lived, grant-bearing
+view token. Tier 2 adds a server-side credential, never a browser-side one.
 
 ## Hub-relayed flow (node scope: internet edge → worker node)
 
