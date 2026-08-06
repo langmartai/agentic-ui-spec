@@ -181,20 +181,24 @@ Properties this topology fixes (SPEC §7.5):
 No per-user provisioning exists anywhere in the serving path. One wildcard, claimed once,
 serves every author; a registry row is the entire "deployment":
 
+In the reference implementation the wildcard is `*.langmart.ai` (already held by the
+platform), the Serving Gateway + registry are langmart.ai's UI gateway, and each
+author's host agent is their own **lm-assist** node:
+
 ```mermaid
 flowchart LR
-  subgraph W["*.example.com — ONE pre-allocated wildcard (DNS + TLS)"]
-    A1["ui-alices-app.example.com"]
-    B1["ui-bobs-app.example.com"]
+  subgraph W["*.langmart.ai — ONE pre-allocated wildcard (DNS + TLS)"]
+    A1["ui-alices-app.langmart.ai"]
+    B1["ui-bobs-app.langmart.ai"]
   end
-  subgraph GW["Serving Gateway (registry)"]
-    RA["uiId: alices-app<br/>owner: Alice · host: Alice's agent"]
-    RB["uiId: bobs-app<br/>owner: Bob · host: Bob's agent"]
+  subgraph GW["langmart.ai UI gateway (Serving Gateway + registry)"]
+    RA["uiId: alices-app<br/>owner: Alice · host: Alice's lm-assist"]
+    RB["uiId: bobs-app<br/>owner: Bob · host: Bob's lm-assist"]
   end
-  HA["Alice's machine<br/>(her agent + UI server)"]
-  HB["Bob's machine<br/>(his agent + UI server)"]
-  A1 -->|Host header → uiId| RA -->|"relay, subject-routed (§7.2)"| HA
-  B1 -->|Host header → uiId| RB -->|"relay, subject-routed (§7.2)"| HB
+  HA["Alice's machine<br/>(lm-assist Core + lmui)"]
+  HB["Bob's machine<br/>(lm-assist Core + lmui)"]
+  A1 -->|Host header → uiId| RA -->|"relay via langmart.ai hub,<br/>subject-routed (§7.2)"| HA
+  B1 -->|Host header → uiId| RB -->|"relay via langmart.ai hub,<br/>subject-routed (§7.2)"| HB
 ```
 
 - **Claiming a name = registering it.** The registry's uiId is unique first-come
@@ -203,7 +207,7 @@ flowchart LR
   proxy rule, or config file exists to create or clean up.
 - **Three independent isolation walls.** (1) *Owner-only serving*: a viewer who is not
   the owner gets a no-access page naming their identity — the UI never renders.
-  (2) *Subject-routed relay*: the hub forwards a UI's requests only to hosts owned by
+  (2) *Subject-routed relay*: the langmart.ai hub forwards a UI's requests only to lm-assist nodes owned by
   that UI's owner — user B's registration names B's host, so B's traffic can never
   reach A's machine. (3) *Scoped data plane*: every view token carries its viewer's
   identity and grant; backend calls execute as that viewer, never as the platform.
