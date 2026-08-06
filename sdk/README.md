@@ -75,6 +75,31 @@ Consequences worth knowing up front:
   should outlive the terminal use `start` / `stop` / `status` — a detached process with
   a pidfile and log under `~/.lmui/`. `status` probes the HTTP port, not just the pid,
   and a stale pidfile is reported rather than trusted.
+- **Host-agent restarts are survivable.** The agent's `/ui-*` route comes from persisted
+  config (in lm-assist: `uiWebPort` in `hub.json`), so an agent restart re-advertises it
+  and relaying resumes — your `lmui start` process runs detached and is untouched. The
+  agent does not supervise lmui; keeping it alive (and restarting it after a host
+  reboot) is yours, or a manager's, job — which is what the contract below exists for.
+
+## The management contract (`~/.lmui/dev-<uiId>.json`)
+
+`start` records machine-readable serving state, one file per UI; `stop` removes it.
+**lmui is the only writer; managers only read.**
+
+```json
+{ "uiId": "my-app", "service": "ui-my-app", "pid": 12345, "port": 5173,
+  "dir": "/home/me/my-app", "sdkPath": "/home/me/agentic-ui-spec/sdk",
+  "log": "/home/me/.lmui/dev-my-app.log", "startedAt": "…" }
+```
+
+Any supervisor — the host agent itself, or an external tool in its own repo — can:
+
+- **list** the UIs served from this machine: glob `~/.lmui/dev-*.json`, check the pid is
+  alive (`kill -0`), probe `http://127.0.0.1:<port>/<service>/index.html`
+- **stop** one: SIGTERM the recorded pid (verify the process is actually lmui first —
+  never trust a stale pidfile)
+- **(re)start** one: run `node <sdkPath>/lmui.js start` with `dir` as the working
+  directory — everything needed is in the file
 
 ## `lmui.config.json` is the declared half of your access
 
