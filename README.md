@@ -4,9 +4,13 @@
 authenticated against a SaaS identity and given narrow, per-viewer access to backend
 APIs — without ever handing the browser a durable credential.**
 
-> **The use case in one sentence:** *an agent generates and manages a UI on your own
-> machine, and it instantly becomes a standard OIDC/OAuth-secured, scope-limited web +
-> API service on the public internet — relayed, not deployed.*
+> **The use case in one sentence:** *an agent generates and manages a UI on a host you
+> control, and it instantly becomes a standard OIDC/OAuth-secured, scope-limited web +
+> API service on the public internet — nothing is uploaded to the platform.*
+
+"On a host you control" means: the page's files live on whichever machine runs the relay
+client (the host agent — lm-assist in the current implementation). That machine IS the
+hosting; the platform relays requests to it per-visit and stores nothing.
 
 Unpacked, that sentence is five claims, each backed by a part of the spec:
 
@@ -15,7 +19,7 @@ Unpacked, that sentence is five claims, each backed by a part of the spec:
 | **agent generates and manages** | the UI is code an LLM/agent wrote and can keep editing — treated as untrusted by construction | §5, §8 |
 | **standard OIDC/OAuth** | viewers sign in with ordinary authorization-code + PKCE against the platform IdP — no invented auth | §3 |
 | **secure, scoped** | the page acts only within an explicit grant (declared or requested at runtime), only as its owner, via a short-lived token — never a real credential | §4, §5.4, §6 |
-| **internet relay** | the files stay on the author's machine; a hub relays each request over the host agent's one authenticated WebSocket — nothing is uploaded or deployed | §7 |
+| **internet relay** | the files live on the relay-client host; a hub relays each request over that host agent's one authenticated WebSocket — the platform stores nothing | §7 |
 | **web + API service** | the result is both a served page *and* a governed data plane to backend APIs, addressed as service + path | §6 |
 
 Modern applications increasingly want to *generate* a UI on demand (often with an LLM/
