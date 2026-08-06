@@ -157,6 +157,11 @@ The host must expose this port to the hub as service "${service}".`);
 const runDir = () => { const d = path.join(os.homedir(), '.lmui'); fs.mkdirSync(d, { recursive: true }); return d; };
 const pidFile = (uiId) => path.join(runDir(), `dev-${uiId}.pid`);
 const logFile = (uiId) => path.join(runDir(), `dev-${uiId}.log`);
+// Machine-readable serving state, one file per UI. This is the MANAGEMENT CONTRACT:
+// any supervisor — a host agent like lm-assist, or an external tool — can list the UIs
+// served from this machine by globbing ~/.lmui/dev-*.json, and restart one by running
+// `node <sdkPath>/lmui.js start` in `dir`. lmui itself stays the only writer.
+const stateFile = (uiId) => path.join(runDir(), `dev-${uiId}.json`);
 function readPid(uiId) {
   try {
     const pid = parseInt(fs.readFileSync(pidFile(uiId), 'utf8').trim(), 10);
@@ -179,6 +184,11 @@ cmds.start = () => {
   });
   child.unref();
   fs.writeFileSync(pidFile(cfg.uiId), String(child.pid) + '\n');
+  fs.writeFileSync(stateFile(cfg.uiId), JSON.stringify({
+    uiId: cfg.uiId, service: cfg.service || 'ui-' + cfg.uiId, pid: child.pid, port,
+    dir: process.cwd(), sdkPath: __dirname, log: logFile(cfg.uiId),
+    startedAt: new Date().toISOString(),
+  }, null, 2) + '\n');
   console.log(`started ${cfg.uiId} (pid ${child.pid}) on http://127.0.0.1:${port}
   log: ${logFile(cfg.uiId)}
   stop with: node lmui.js stop`);
@@ -193,6 +203,7 @@ cmds.stop = () => {
   }
   process.kill(pid); // SIGTERM — the dev server holds no state worth a grace dance
   try { fs.unlinkSync(pidFile(cfg.uiId)); } catch {}
+  try { fs.unlinkSync(stateFile(cfg.uiId)); } catch {}
   console.log(`stopped ${cfg.uiId} (pid ${pid})`);
 };
 
