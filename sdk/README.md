@@ -28,7 +28,41 @@ Environment: `LMUI_GATEWAY` (required), `LMUI_WORKER_ID`, `LMUI_COOKIE`, `PORT`.
 ## Where your code lives
 
 On your machine. The hub relays each request to `lmui dev` and **keeps no copy**, so what is
-on disk is what is served on the next load. Consequences worth knowing up front:
+on disk is what is served on the next load.
+
+## Who holds the WebSocket (topology)
+
+`lmui dev` does **not** connect to the hub. It is a plain local HTTP server bound to
+loopback, holding no credential of any kind. The hub connection belongs to the **host
+agent** — the long-running process on your machine that already maintains one
+authenticated outbound WebSocket to the hub (in the reference implementation, the
+lm-assist Core). The agent declares a service route mapping the relayed path prefix
+`/ui-<uiId>/` to lmui's local port:
+
+```
+browser ── serving gateway ── hub ══ WebSocket ══ host agent ──► http://127.0.0.1:<port>
+   (internet side)                    (ONE per host,              (lmui dev/start —
+                                       held by the agent)          no hub knowledge)
+```
+
+This split is deliberate, not an implementation accident:
+
+- **One authenticated connection per host.** The agent already proved its identity to the
+  hub; a second WebSocket per UI would mean a second credential per UI to provision,
+  rotate, and leak.
+- **The dev server stays credential-free.** Anyone can run, copy, or modify `lmui.js`
+  without touching anything secret — consistent with the spec's rule that the page (and
+  now its server) never holds a backend credential.
+- **`register` names the host, not a socket.** The registry entry's `workerId` says which
+  agent's WebSocket serves this UI; the hub routes by that, per SPEC §7.2.
+
+Concretely, with lm-assist as the host agent: set the UI port once in its hub config
+(`uiWebPort` in `~/.lm-assist/hub.json`) and restart the Core; it then advertises the
+`/ui-*` route and relays every matching request to that port. Any other conforming agent
+can fill the same role — the contract is only "authenticated outbound WebSocket + local
+HTTP forward" (SPEC §7).
+
+Consequences worth knowing up front:
 
 - **Your host is the availability.** Host off ⇒ the UI is unavailable. That is the deal: you
   own the app and its uptime.

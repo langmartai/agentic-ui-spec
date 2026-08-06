@@ -256,6 +256,14 @@ only on its authenticated Hub channel, never from an arbitrary caller.
 7.4. A scope's local tier becomes internet-reachable ONLY via its Hub tier. The Hub is
 that scope's internet-facing part — not a scope of its own.
 
+7.5. **The UI's local server holds no Hub credential.** The reverse connection to the Hub
+belongs to a host *agent* — one authenticated connection per host, not per UI — which
+forwards relayed requests to local, loopback-bound UI servers according to declared
+routes. A UI author's serving tool MUST be runnable with no credential of any kind; the
+registry entry names the *host* whose agent serves the UI, and the Hub routes to that
+host's connection (7.2). This bounds credentials by hosts rather than UIs and keeps the
+authoring path consistent with the no-credential rule of §8.
+
 ## 8. UI authoring contract
 
 A conforming UI MAY assume, and MUST limit itself to:
