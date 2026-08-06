@@ -13,6 +13,10 @@ where a page can act only within its declared grant and only as the viewer.
 
 📄 **[Read the specification → SPEC.md](SPEC.md)** (AUIS v0.1, RFC 2119 language)
 
+🎨 **[UI Design Guide → GUIDE.md](GUIDE.md)** — how to build a UI on this model: page
+anatomy (identity badge, live access panel, token state), auth from the page's
+perspective, the scope request lifecycle, and an annotated tour of the example.
+
 ## What it covers
 
 - **Authentication** — OIDC + PKCE, in **two exposure classes**: internet-facing

@@ -37,6 +37,10 @@ on disk is what is served on the next load. Consequences worth knowing up front:
   plain browser reload picks up changes.
 - **1 MB per file.** The relay caps a single response. `lmui dev` returns **413 with an
   explanation** rather than letting the hub truncate silently — split large bundles.
+- **Background serving.** `dev` is the foreground edit-and-reload loop; for a demo that
+  should outlive the terminal use `start` / `stop` / `status` — a detached process with
+  a pidfile and log under `~/.lmui/`. `status` probes the HTTP port, not just the pid,
+  and a stale pidfile is reported rather than trusted.
 
 ## `lmui.config.json` is the declared half of your access
 

@@ -148,6 +148,70 @@ The host must expose this port to the hub as service "${service}".`);
   });
 };
 
+// ── background dev server: start / stop / status ──────────────────────────────────────
+// `dev` runs in the foreground (the edit-and-reload loop). These three manage it as a
+// long-lived background process instead — pidfile + log under ~/.lmui/ — so a demo can
+// keep serving after the terminal closes. No daemons, no supervisors: just a detached
+// child and a pidfile that status/stop check honestly (a stale pidfile is reported, not
+// trusted).
+const runDir = () => { const d = path.join(os.homedir(), '.lmui'); fs.mkdirSync(d, { recursive: true }); return d; };
+const pidFile = (uiId) => path.join(runDir(), `dev-${uiId}.pid`);
+const logFile = (uiId) => path.join(runDir(), `dev-${uiId}.log`);
+function readPid(uiId) {
+  try {
+    const pid = parseInt(fs.readFileSync(pidFile(uiId), 'utf8').trim(), 10);
+    if (!pid) return null;
+    process.kill(pid, 0); // liveness probe, no signal delivered
+    return pid;
+  } catch { return null; }
+}
+
+cmds.start = () => {
+  const cfg = loadCfg();
+  const running = readPid(cfg.uiId);
+  if (running) die(`already running (pid ${running}) — 'node lmui.js status' / 'stop'`);
+  const port = Number(process.env.PORT || cfg.dev?.port || 5173);
+  const { spawn } = require('child_process');
+  const log = fs.openSync(logFile(cfg.uiId), 'a');
+  const child = spawn(process.execPath, [__filename, 'dev'], {
+    cwd: process.cwd(), detached: true, stdio: ['ignore', log, log],
+    env: { ...process.env, PORT: String(port) },
+  });
+  child.unref();
+  fs.writeFileSync(pidFile(cfg.uiId), String(child.pid) + '\n');
+  console.log(`started ${cfg.uiId} (pid ${child.pid}) on http://127.0.0.1:${port}
+  log: ${logFile(cfg.uiId)}
+  stop with: node lmui.js stop`);
+};
+
+cmds.stop = () => {
+  const cfg = loadCfg();
+  const pid = readPid(cfg.uiId);
+  if (!pid) {
+    try { fs.unlinkSync(pidFile(cfg.uiId)); } catch {}
+    die(`${cfg.uiId} is not running`);
+  }
+  process.kill(pid); // SIGTERM — the dev server holds no state worth a grace dance
+  try { fs.unlinkSync(pidFile(cfg.uiId)); } catch {}
+  console.log(`stopped ${cfg.uiId} (pid ${pid})`);
+};
+
+cmds.status = async () => {
+  const cfg = loadCfg();
+  const port = Number(process.env.PORT || cfg.dev?.port || 5173);
+  const pid = readPid(cfg.uiId);
+  console.log(`${cfg.uiId}:`);
+  console.log(`  process : ${pid ? `running (pid ${pid})` : 'not running'}`);
+  // The pid says a process exists; only an HTTP probe says it is actually serving.
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/${cfg.service || 'ui-' + cfg.uiId}/index.html`, { signal: AbortSignal.timeout(3000) });
+    console.log(`  serving : http://127.0.0.1:${port} -> HTTP ${r.status}`);
+  } catch {
+    console.log(`  serving : NOT responding on :${port}${pid ? ' (process alive but port dead — check the log)' : ''}`);
+  }
+  console.log(`  log     : ${logFile(cfg.uiId)}`);
+};
+
 cmds.scopes = async () => {
   const cfg = loadCfg();
   const d = await api('GET', `/access/scopes?uiId=${encodeURIComponent(cfg.uiId)}`);
@@ -191,7 +255,10 @@ if (!cmd || !cmds[cmd]) {
   init <uiId>        scaffold lmui.config.json + index.html + assets/lmui.js
   login              store a gateway session (0600)
   register           create/update the registry entry (owner-only, always)
-  dev                serve this folder for the hub to relay
+  dev                serve this folder for the hub to relay (foreground)
+  start              same, in the background (pidfile + log in ~/.lmui/)
+  stop               stop the background server
+  status             process + live HTTP probe + log path
   scopes             what this UI declares, what it was granted, what it may ask for
   release [svc path] give back granted access (all, or one rule)
   list               your registered UIs

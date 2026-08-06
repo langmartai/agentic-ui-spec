@@ -267,6 +267,9 @@ A conforming UI MAY assume, and MUST limit itself to:
 - Nothing else: no cross-origin fetch, no ambient cookies for data, no server-side code,
   no knowledge of any backend credential.
 
+*Non-normative: [GUIDE.md](GUIDE.md) develops this contract into page-design practice —
+identity badge, live access panel, token state, and the runtime grant lifecycle.*
+
 ## 9. Conformance
 
 An implementation MUST maintain a conformance ledger enumerating every MUST it does not
