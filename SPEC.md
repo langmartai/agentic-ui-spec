@@ -131,10 +131,19 @@ server-side rendering.
 
 5.2. Serving MUST require an authenticated session for the entry document AND its assets.
 
-5.3. A restrictive content-security policy MUST confine the page to its serving origin
-(no external script/style/font/connect). Trusted first-party UIs MAY use inline
-script/style; **untrusted (e.g. agent-generated) UIs MUST NOT be admitted** until per-UI
-origin isolation and a stricter CSP exist.
+5.3. **Origin isolation by trust.** A restrictive content-security policy MUST confine the
+page to its serving origin (no external script/style/font/connect).
+
+- **Trusted first-party apps** (code the viewer themselves operate — e.g. a worker app the
+  user runs) MAY be served from a credential-bearing origin under an *explicit, documented
+  trust decision*: the app's code is the user's own, so its access to that origin's
+  credentials is not a privilege escalation. Such apps MAY use inline script/style.
+- **Untrusted or generated UIs** (agent-authored, third-party, or shared) MUST be served
+  from a **dedicated origin that holds no ambient platform credential** — a separate
+  subdomain per deployment (and, for stronger isolation, per UI). They MUST NOT be served
+  from, or framed such that they can reach, an origin carrying the viewer's session cookie
+  or API keys. This origin separation — not the CSP alone — is what lets untrusted code be
+  admitted at all: on it, the only credential reachable is the short-lived view token.
 
 5.4. **Access modes:** `owner` (only the owning subject may load) and `authenticated`
 (any authenticated subject may load — *as themselves*, §6.2). An anonymous/share-link

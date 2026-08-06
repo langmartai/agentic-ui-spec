@@ -136,6 +136,32 @@ sequenceDiagram
   SG-->>B: passthrough
 ```
 
+## Origins and the trust boundary (SPEC §5.3)
+
+Three classes of served content sit on deliberately different origins:
+
+```mermaid
+flowchart TB
+  subgraph O1["Platform origin — credential-bearing"]
+    DASH["Dashboard + platform UIs<br/>holds session cookie + API keys"]
+    WRK["Trusted worker apps (/w/*)<br/>the user's OWN code — same-origin ACCEPTED"]
+  end
+  subgraph O2["Dedicated UI origin — NO ambient credential"]
+    GEN["Generic / pluggable / generated UIs<br/>only credential reachable = short-lived view token"]
+  end
+  DASH -.->|"embeds"| GEN
+  note["Untrusted or generated UIs live ONLY on O2.\nThey can never reach O1's cookie or localStorage."]
+```
+
+- **Platform origin** carries the viewer's session cookie and saved API keys. The dashboard
+  and **trusted worker apps** (`/w/*`, the user's own code) live here; same-origin is an
+  accepted trust decision, not a defect (SPEC §5.3, first bullet).
+- **Dedicated UI origin** (a distinct subdomain, e.g. a `ui.`-prefixed host) serves the
+  **generic / pluggable / generated** UIs and holds *no* ambient platform credential. On
+  this origin the only credential a page can reach is its short-lived, grant-bearing view
+  token, so even fully untrusted (agent-generated) UIs cannot exfiltrate account
+  credentials. This is where the pluggable-UI framework's generated UIs are served.
+
 ## Notes
 
 - **Internet exposure of lm-assist:** the lm-assist web app and node live on a worker/LAN;
