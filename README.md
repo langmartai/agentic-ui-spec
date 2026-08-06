@@ -31,6 +31,11 @@ where a page can act only within its declared grant and only as the viewer.
 anatomy (identity badge, live access panel, token state), auth from the page's
 perspective, the scope request lifecycle, and an annotated tour of the example.
 
+🧰 **[Reference SDK → sdk/](sdk/README.md)** — not an optional extra: the CLI
+(`init`/`login`/`register`/`dev`/`start`/`stop`/`status`), the page runtime
+(`lmui.call`, request/release, re-mint), and the canonical example UI. Zero
+dependencies, runnable straight from a clone — this is the working half of the spec.
+
 ## Try it — the demo
 
 The [`sdk/`](sdk/) is runnable straight from a clone (Node 18+, zero dependencies):
@@ -66,6 +71,9 @@ back. [GUIDE.md §5](GUIDE.md) annotates every region of the page.
 - **Hub routing** — how an internet-facing relay carries requests to backends that dial
   out to it, fail-closed, subject-routed, forwarding the viewer's identity.
 - **Authoring contract** — the minimal, safe surface a UI (or a UI generator) may target.
+- **Reference SDK** — the contract made runnable: a credential-free local server the hub
+  relays to (the author's machine IS the hosting), a page runtime that speaks the data
+  plane and grant lifecycle, and the example UI the design guide annotates.
 
 ## Design stance
 
