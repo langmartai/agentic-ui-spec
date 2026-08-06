@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>My pluggable UI</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; background: #0f172a; color: #e2e8f0; }
+    pre { background: #1e293b; padding: 1rem; border-radius: 8px; overflow-x: auto; }
+    button { padding: .5rem 1rem; border-radius: 6px; border: 0; background: #3b82f6; color: #fff; cursor: pointer; margin-right: .5rem; }
+    .err { color: #f87171; }
+  </style>
+</head>
+<body>
+  <h1>My pluggable UI</h1>
+  <p>Signed in as <code id="who">…</code></p>
+
+  <!-- Files live on YOUR machine. The hub relays each request here and keeps no copy,
+       so editing this file and reloading is the whole dev loop. -->
+  <button id="declared">Call my declared grant</button>
+  <button id="ask">Ask for more access</button>
+  <button id="give-back">Give it back</button>
+  <pre id="out">ready</pre>
+
+  <script src="assets/lmui.js"></script>
+  <script>
+    var out = document.getElementById('out');
+    function show(p) {
+      out.classList.remove('err');
+      Promise.resolve(p).then(function (r) { return r.json().then(function (j) {
+        out.textContent = 'HTTP ' + r.status + '\n' + JSON.stringify(j, null, 2).slice(0, 3000);
+        if (!r.ok) out.classList.add('err');
+      }); }).catch(function (e) { out.classList.add('err'); out.textContent = String(e); });
+    }
+    fetch('/auth/me', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+      .then(function (d) { document.getElementById('who').textContent = (d.claims && (d.claims.name || d.claims.email)) || d.userId; })
+      .catch(function () {});
+
+    // 1. What this UI declared in lmui.config.json — works immediately, no asking.
+    document.getElementById('declared').onclick = function () { show(lmui.call('platform', '/api/models')); };
+
+    // 2. Anything else must be requested at runtime. lmui.call re-mints automatically, so
+    //    after this the new access is live without a reload.
+    document.getElementById('ask').onclick = function () {
+      lmui.requestAccess([{ service: 'platform', pathPrefix: '/api/user/quota/status', verbs: ['GET'] }], 'show my quota')
+        .then(function (d) {
+          out.textContent = d.granted ? 'granted — press "Call my declared grant" logic for the new path'
+                                      : 'consent needed, open: ' + d.consentUrl;
+          if (d.granted) show(lmui.call('platform', '/api/user/quota/status'));
+        }).catch(function (e) { out.classList.add('err'); out.textContent = String(e); });
+    };
+
+    // 3. Give it back when you no longer need it.
+    document.getElementById('give-back').onclick = function () {
+      lmui.releaseAccess('platform', '/api/user/quota/status')
+        .then(function (d) { out.textContent = 'released ' + d.revokedRules + ' rule(s)'; })
+        .catch(function (e) { out.classList.add('err'); out.textContent = String(e); });
+    };
+  </script>
+</body>
+</html>
