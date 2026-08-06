@@ -2,38 +2,111 @@
 <html>
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>My pluggable UI</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; background: #0f172a; color: #e2e8f0; }
-    pre { background: #1e293b; padding: 1rem; border-radius: 8px; overflow-x: auto; }
-    button { padding: .5rem 1rem; border-radius: 6px; border: 0; background: #3b82f6; color: #fff; cursor: pointer; margin-right: .5rem; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+             padding: .9rem 1.4rem; background: #1e293b; border-bottom: 1px solid #334155; }
+    header h1 { font-size: 1.05rem; margin: 0; }
+    .badge { display: inline-flex; align-items: center; gap: .45rem; background: #0f172a; border: 1px solid #334155;
+             border-radius: 999px; padding: .3rem .8rem; font-size: .8rem; }
+    .badge .dot { width: .5rem; height: .5rem; border-radius: 50%; background: #22c55e; }
+    .chip { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: .2rem .5rem;
+            font-family: monospace; font-size: .75rem; color: #94a3b8; }
+    main { display: grid; grid-template-columns: 320px 1fr; gap: 1rem; padding: 1rem 1.4rem; max-width: 1000px; }
+    @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 1rem; }
+    .card h2 { font-size: .8rem; margin: 0 0 .7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
+    .grant { margin: .35rem 0; font-family: monospace; font-size: .78rem; line-height: 1.5; word-break: break-all; }
+    .grant.hard { color: #7dd3fc; }  .grant.dyn { color: #fbbf24; }  .grant.none { color: #64748b; font-style: italic; }
+    .sect { margin-bottom: 1rem; }
+    .sect p.hint { margin: .2rem 0 .6rem; font-size: .78rem; color: #94a3b8; line-height: 1.45; }
+    button { padding: .5rem .9rem; border-radius: 7px; border: 0; background: #2563eb; color: #fff;
+             cursor: pointer; margin: 0 .4rem .45rem 0; font-size: .82rem; }
+    button.ghost { background: #334155; }
+    pre { background: #020617; border: 1px solid #334155; padding: 1rem; border-radius: 10px;
+          overflow-x: auto; font-size: .78rem; line-height: 1.45; min-height: 7rem; margin: 0; }
     .err { color: #f87171; }
+    .tok { font-size: .74rem; color: #64748b; margin-top: .6rem; }
+    .tok b { color: #94a3b8; font-weight: 600; }
   </style>
 </head>
 <body>
-  <h1>My pluggable UI</h1>
-  <p>Signed in as <code id="who">…</code></p>
-
   <!-- Files live on YOUR machine. The hub relays each request here and keeps no copy,
        so editing this file and reloading is the whole dev loop. -->
-  <button id="declared">Call my declared grant</button>
-  <button id="ask">Ask for more access</button>
-  <button id="give-back">Give it back</button>
-  <pre id="out">ready</pre>
+  <header>
+    <h1>My pluggable UI <span class="chip" id="uiid"></span> <span class="chip">served from my machine</span></h1>
+    <span class="badge"><span class="dot"></span> <span id="who">…</span></span>
+  </header>
+  <main>
+    <aside class="card">
+      <h2>Live access panel</h2>
+      <div class="grant" style="color:#94a3b8">① declared (lmui.config.json):</div>
+      <div class="grant hard" id="hardcoded">…</div>
+      <div class="grant" style="color:#94a3b8;margin-top:.7rem">② granted at runtime:</div>
+      <div class="grant dyn" id="granted">…</div>
+      <div class="tok"><b>token:</b> <span id="tokexp">…</span></div>
+    </aside>
+
+    <section>
+      <div class="card sect">
+        <h2>① Declared access — works immediately</h2>
+        <p class="hint">/api/models is declared in lmui.config.json, so no request is needed.</p>
+        <button id="declared">Call my declared grant</button>
+      </div>
+      <div class="card sect">
+        <h2>② Runtime access — request, use, give back</h2>
+        <p class="hint">Quota is not declared: request it (your own UI — granted instantly), then give it back.</p>
+        <button id="ask">Ask for more access</button>
+        <button id="give-back" class="ghost">Give it back</button>
+        <button id="show-scope" class="ghost">Show current scope</button>
+      </div>
+      <pre id="out">ready</pre>
+    </section>
+  </main>
 
   <script src="assets/lmui.js"></script>
   <script>
+    document.getElementById('uiid').textContent = lmui.uiId;
     var out = document.getElementById('out');
     function show(p) {
       out.classList.remove('err');
-      Promise.resolve(p).then(function (r) { return r.json().then(function (j) {
+      return Promise.resolve(p).then(function (r) { return r.json().then(function (j) {
         out.textContent = 'HTTP ' + r.status + '\n' + JSON.stringify(j, null, 2).slice(0, 3000);
         if (!r.ok) out.classList.add('err');
       }); }).catch(function (e) { out.classList.add('err'); out.textContent = String(e); });
     }
+    // Who is signed in: /auth/me carries the session identity (the token only has the id).
     fetch('/auth/me', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
-      .then(function (d) { document.getElementById('who').textContent = (d.claims && (d.claims.name || d.claims.email)) || d.userId; })
+      .then(function (d) {
+        var c = d.claims || {};
+        document.getElementById('who').textContent = (c.name ? c.name + ' — ' : '') + (c.email || d.userId);
+      })
       .catch(function () {});
+
+    function fmt(rules) {
+      return (rules || []).map(function (r) {
+        return r.service + ':' + r.pathPrefix + ' [' + r.verbs.join(',') + ']';
+      }).join('  ');
+    }
+
+    // Live access panel: declared (①) vs runtime-granted (②), plus token expiry.
+    function refreshPanel() {
+      lmui.scopes().then(function (d) {
+        var h = fmt(d.ui && d.ui.hardcodedGrant), g = fmt(d.ui && d.ui.approvedGrant);
+        var hd = document.getElementById('hardcoded'), gr = document.getElementById('granted');
+        hd.textContent = h || '(none)'; hd.className = 'grant ' + (h ? 'hard' : 'none');
+        gr.textContent = g || '(none yet — press Ask)'; gr.className = 'grant ' + (g ? 'dyn' : 'none');
+      }).catch(function () {});
+      try {
+        var c = JSON.parse(atob(lmui.token.split('.')[1]));
+        var secs = c.exp - Math.floor(Date.now() / 1000);
+        document.getElementById('tokexp').textContent =
+          secs > 0 ? 'expires in ' + Math.floor(secs / 60) + 'm' : 'EXPIRED (any call re-mints)';
+      } catch (e) {}
+    }
 
     // 1. What this UI declared in lmui.config.json — works immediately, no asking.
     document.getElementById('declared').onclick = function () { show(lmui.call('platform', '/api/models')); };
@@ -43,18 +116,36 @@
     document.getElementById('ask').onclick = function () {
       lmui.requestAccess([{ service: 'platform', pathPrefix: '/api/user/quota/status', verbs: ['GET'] }], 'show my quota')
         .then(function (d) {
-          out.textContent = d.granted ? 'granted — press "Call my declared grant" logic for the new path'
-                                      : 'consent needed, open: ' + d.consentUrl;
-          if (d.granted) show(lmui.call('platform', '/api/user/quota/status'));
+          if (d.granted) {
+            out.textContent = 'granted (your own UI — nothing to approve)';
+            refreshPanel();
+            show(lmui.call('platform', '/api/user/quota/status'));
+          } else {
+            out.textContent = 'consent needed, open: ' + d.consentUrl;
+          }
         }).catch(function (e) { out.classList.add('err'); out.textContent = String(e); });
     };
 
     // 3. Give it back when you no longer need it.
     document.getElementById('give-back').onclick = function () {
       lmui.releaseAccess('platform', '/api/user/quota/status')
-        .then(function (d) { out.textContent = 'released ' + d.revokedRules + ' rule(s)'; })
+        .then(function (d) { out.textContent = 'released ' + d.revokedRules + ' rule(s)'; refreshPanel(); })
         .catch(function (e) { out.classList.add('err'); out.textContent = String(e); });
     };
+
+    // 4. What can this page do right now? The live token is the authority.
+    document.getElementById('show-scope').onclick = function () {
+      try {
+        var c = JSON.parse(atob(lmui.token.split('.')[1]));
+        var lines = ['CURRENT SCOPE', '  viewer: ' + c.sub, '  UI:     ' + c.aud, '', '  grant in live token:'];
+        (c.grant || []).forEach(function (r) { lines.push('    • ' + r.service + ':' + r.pathPrefix + ' [' + r.verbs.join(',') + ']'); });
+        if (!(c.grant || []).length) lines.push('    (empty)');
+        out.classList.remove('err');
+        out.textContent = lines.join('\n');
+      } catch (e) { out.classList.add('err'); out.textContent = String(e); }
+    };
+
+    refreshPanel();
   </script>
 </body>
 </html>
