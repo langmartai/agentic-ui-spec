@@ -41,14 +41,16 @@ where a page can act only within its declared grant and only as the viewer.
 
 ## Implementations
 
-AUIS is extracted from a working system; the following implement its roles:
+AUIS is extracted from a working system. See **[ARCHITECTURE.md](ARCHITECTURE.md)** for the
+reference deployment, with diagrams.
 
-- **LangMart `ui-gateway`** — Serving Gateway, Registry, View Token, and Data Plane.
-- **LangMart platform OIDC** — the Identity Provider role.
-- **[lm-assist](https://github.com/langmartai/lm-assist)** — the **Hub** role (its
-  internet-facing relay and web tier) and **Local Authentication** (LAN public-client
-  login); an lm-assist node is a Data Source. lm-assist is one implementation that follows
-  this specification, not the specification itself.
+- **[langmart.ai](https://langmart.ai)** — implements the **Identity Provider** (SSO/OAuth),
+  the **Hub** (internet-facing relay and routing) and its web tier, and the **Serving
+  Gateway + Registry**; its platform API is a Data Source.
+- **[lm-assist](https://github.com/langmartai/lm-assist)** — a **web-app implementation**
+  that is routed to the public internet *through* the langmart.ai hub. It implements
+  **Local Authentication** (LAN public-client login), and its node is a Data Source.
+  lm-assist follows this specification; it is not the specification.
 
 If you implement AUIS, open a PR adding your project here.
 

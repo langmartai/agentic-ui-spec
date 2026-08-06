@@ -22,6 +22,31 @@ APIs and data, without ever handing the browser a durable credential.
 | **Hub** | An internet-facing routing layer relaying requests to Data Sources that dial out to it (§7). |
 | **UI** | A directory of static artifacts, registered in exactly one scope. |
 
+### 1.1 Architecture at a glance (abstract)
+
+Roles and the trust direction between them. No role is a product; see
+[ARCHITECTURE.md](ARCHITECTURE.md) for how a concrete deployment maps onto them.
+
+```mermaid
+flowchart TB
+  U["Viewer<br/>(browser + UI page)"]
+  IDP["Identity Provider<br/>OIDC / SSO"]
+  SG["Serving Gateway<br/>sessions, view tokens, data API"]
+  REG["Registry<br/>(per scope)"]
+  HUB["Hub<br/>internet-facing relay"]
+  DS["Data Source"]
+
+  U -->|"1 · OIDC + PKCE login"| IDP
+  IDP -->|"id_token"| SG
+  U -->|"2 · load UI (session cookie)"| SG
+  SG -->|"read entry + grant"| REG
+  SG -->|"3 · inject short-lived view token"| U
+  U -->|"4 · data call: view token + service/path"| SG
+  SG -->|"per-user credential (optional)"| DS
+  SG -->|"hub-relayed identity"| HUB
+  HUB -->|"reverse-dial channel"| DS
+```
+
 ## 2. Scopes and registries
 
 2.1. Every UI MUST belong to exactly one scope; its registry entry, serving, and data
