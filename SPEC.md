@@ -60,7 +60,8 @@ at registration, so a nonconforming entry cannot exist, not merely cannot act.
 local/LAN tier); both serve the same registry entries under the same contracts.
 
 2.4. A registry entry MUST carry at minimum: `uiId` (unique in scope), `name`, artifact
-location, `ownerUserId`, `access` mode (§5.4), `enabled`, and the `grant` (§4).
+location, `ownerUserId` (the OIDC `sub` it is bound to — see §5.4), `enabled`, and the
+`grant` (§4).
 
 2.5. Registration MUST be authenticated and MUST bind `ownerUserId` to the authenticated
 subject. A caller MUST NOT register or mutate another owner's entry.
@@ -145,10 +146,31 @@ page to its serving origin (no external script/style/font/connect).
   or API keys. This origin separation — not the CSP alone — is what lets untrusted code be
   admitted at all: on it, the only credential reachable is the short-lived view token.
 
-5.4. **Access modes:** `owner` (only the owning subject may load) and `authenticated`
-(any authenticated subject may load — *as themselves*, §6.2). An anonymous/share-link
-mode is reserved and MUST NOT be implemented without self-describing, expiring,
-revocable capability tokens.
+5.4. **Access is bound to one identity: the owner's.** A UI records the OIDC `sub` that
+registered it, and MUST be loadable **only** when the authenticated subject equals that
+owner. It is also listed only in that owner's catalog — another user cannot see that it
+exists, let alone open it.
+
+This is a deliberate structural choice, not a policy default, and it is what keeps a
+pluggable UI in the same trust posture as any application a user runs for themselves: the
+author and the viewer are **always the same person**. An "any authenticated user may open
+it" mode would mean one user's code executing in another user's browser, which is the
+precondition for a whole class of attacks that no amount of downstream mitigation removes:
+
+- **cookie tossing / session fixation** — cookies are scoped by registrable domain, not
+  origin, so third-party code on a sibling host can overwrite a session cookie;
+- **borrowed-brand phishing** — hostile code served from the platform's own domain wears the
+  domain as a trust signal;
+- **cross-UI credential theft** — one UI inducing the serving point to mint or reveal
+  another UI's view token.
+
+Forbidding the mode removes the precondition for all of them at once. Implementations MUST
+NOT offer a "shared" or "public" access mode.
+
+An anonymous/share-link mode is reserved and MUST NOT be implemented without
+self-describing, expiring, revocable capability tokens **and** an origin that carries no
+ambient credential (§5.3) — because a share link reintroduces exactly the author ≠ viewer
+condition this clause removes.
 
 ## 6. Data plane — credentials and backend API access
 
@@ -196,7 +218,10 @@ and (b) a credential strategy. Two strategies are defined:
   Data Source cannot yet take a per-user credential — and record the resulting gap (6.6).
 
 6.4. **The viewer's-authority rule.** Data access MUST be authorized as the *viewer* (the
-token's `sub`) — never as the UI's author, never as an ambient privileged principal.
+token's `sub`) — never as the UI's author, never as an ambient privileged principal. Under
+§5.4 the viewer and the author are the same subject, so this reduces to "the UI acts as its
+owner"; the rule is stated in terms of the viewer because that is what the data plane can
+actually check, and it must keep holding if a share-link mode is ever added.
 Under the per-user strategy this is intrinsic (the viewer's credential is used). Under the
 hub-relayed strategy the Data Source MUST enforce the asserted identity; until it does,
 6.6 applies.
