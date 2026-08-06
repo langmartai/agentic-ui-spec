@@ -176,6 +176,40 @@ Properties this topology fixes (SPEC §7.5):
 - **Host off ⇒ UI off.** Availability belongs to the author. The gateway keeps no copy to
   fall back to, by design.
 
+## Multi-tenancy — many authors, one wildcard
+
+No per-user provisioning exists anywhere in the serving path. One wildcard, claimed once,
+serves every author; a registry row is the entire "deployment":
+
+```mermaid
+flowchart LR
+  subgraph W["*.example.com — ONE pre-allocated wildcard (DNS + TLS)"]
+    A1["ui-alices-app.example.com"]
+    B1["ui-bobs-app.example.com"]
+  end
+  subgraph GW["Serving Gateway (registry)"]
+    RA["uiId: alices-app<br/>owner: Alice · host: Alice's agent"]
+    RB["uiId: bobs-app<br/>owner: Bob · host: Bob's agent"]
+  end
+  HA["Alice's machine<br/>(her agent + UI server)"]
+  HB["Bob's machine<br/>(his agent + UI server)"]
+  A1 -->|Host header → uiId| RA -->|"relay, subject-routed (§7.2)"| HA
+  B1 -->|Host header → uiId| RB -->|"relay, subject-routed (§7.2)"| HB
+```
+
+- **Claiming a name = registering it.** The registry's uiId is unique first-come
+  (reserved names denylisted); from that moment `ui-<uiId>.<domain>` routes, because the
+  gateway resolves the Host header to the uiId per request — no per-app DNS, cert,
+  proxy rule, or config file exists to create or clean up.
+- **Three independent isolation walls.** (1) *Owner-only serving*: a viewer who is not
+  the owner gets a no-access page naming their identity — the UI never renders.
+  (2) *Subject-routed relay*: the hub forwards a UI's requests only to hosts owned by
+  that UI's owner — user B's registration names B's host, so B's traffic can never
+  reach A's machine. (3) *Scoped data plane*: every view token carries its viewer's
+  identity and grant; backend calls execute as that viewer, never as the platform.
+- **Failure isolation follows ownership.** Alice's host being offline 503s exactly
+  Alice's UIs; Bob's are untouched. Availability, like the files, belongs to the author.
+
 ## Origins and the trust boundary (SPEC §5.3)
 
 Three classes of served content sit on deliberately different origins:

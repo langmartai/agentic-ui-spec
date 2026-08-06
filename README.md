@@ -59,6 +59,24 @@ buttons that walk the whole grant lifecycle: call a declared path, get refused o
 undeclared one, request access (granted instantly — you own the UI), use it, give it
 back. [GUIDE.md §5](GUIDE.md) annotates every region of the page.
 
+## Many authors, one wildcard (multi-tenancy)
+
+Every user gets this independently — there is **no per-user infrastructure step**:
+
+- The platform pre-allocates **one** wildcard (`*.<domain>`, DNS + TLS) once. The fixed
+  `ui-` prefix carves the app namespace out of it: `ui-<uiId>.<domain>` resolves and has
+  valid TLS for *any* uiId, with zero DNS/cert/proxy work per app.
+- **Registering a uiId IS the allocation.** `POST /registry/uis` (the Serving Gateway's
+  API) claims the name first-come (reserved names denylisted) and binds it to the
+  caller's identity; the gateway derives the uiId from the Host header at request time.
+- Isolation is three independent walls: **owner-only serving** (another account gets a
+  no-access page, the UI never renders), **subject-routed relay** (SPEC §7.2 — a UI
+  relays only to hosts owned by *its* owner; nobody's traffic can reach your machine),
+  and a **scoped data plane** (each viewer's tokens carry their own identity and grants).
+
+Two users on the same platform are therefore fully parallel: own uiId under the shared
+wildcard, own machine as the hosting, own identity end to end.
+
 ## What it covers
 
 - **Authentication** — OIDC + PKCE, in **two exposure classes**: internet-facing
