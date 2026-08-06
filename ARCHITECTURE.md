@@ -136,6 +136,46 @@ sequenceDiagram
   SG-->>B: passthrough
 ```
 
+## Worker-hosted UI serving — who holds the WebSocket (SPEC §7.5)
+
+The flow above is the *data plane*. A worker-hosted UI's **page files** travel the same
+channel: they live on the author's machine and are relayed per-request — the gateway
+stores nothing. The key structural fact is *who owns the hub connection*:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant B as Browser
+  participant SG as UI gateway (Serving Gateway)
+  participant HUB as langmart.ai Hub
+  participant AG as Host agent (lm-assist Core)
+  participant LS as UI server (lmui, loopback)
+
+  Note over AG: ONE authenticated reverse WebSocket per HOST,<br/>held by the agent — never by the UI server
+  B->>SG: GET / (session cookie)
+  SG->>SG: owner check → this UI's registry entry names its host (workerId)
+  SG->>HUB: fetch /ui-<uiId>/index.html for that host
+  HUB->>AG: forward over the host's reverse-dial channel
+  AG->>LS: HTTP to 127.0.0.1:<port> (declared /ui-* service route)
+  LS-->>AG: file from the author's disk
+  AG-->>HUB: response (inner status preserved)
+  HUB-->>SG: response
+  SG->>SG: inject view token (document requests only)
+  SG-->>B: the page — served from the author's machine
+```
+
+Properties this topology fixes (SPEC §7.5):
+
+- **Credentials scale with hosts, not UIs.** The agent authenticated once; every UI on
+  that host rides the same channel. No per-UI secret exists to provision, rotate, or leak.
+- **The UI server is credential-free.** `lmui` is a plain loopback HTTP server anyone can
+  run or copy — consistent with §8's rule that the authoring side never holds a secret.
+- **Honest failure.** The relay wraps the host's real status; the gateway must check it —
+  a host-side 404 must surface as an unreachable-host error, never be rendered *as* the
+  page.
+- **Host off ⇒ UI off.** Availability belongs to the author. The gateway keeps no copy to
+  fall back to, by design.
+
 ## Origins and the trust boundary (SPEC §5.3)
 
 Three classes of served content sit on deliberately different origins:
