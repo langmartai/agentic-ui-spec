@@ -4,6 +4,20 @@
 authenticated against a SaaS identity and given narrow, per-viewer access to backend
 APIs — without ever handing the browser a durable credential.**
 
+> **The use case in one sentence:** *an agent generates and manages a UI on your own
+> machine, and it instantly becomes a standard OIDC/OAuth-secured, scope-limited web +
+> API service on the public internet — relayed, not deployed.*
+
+Unpacked, that sentence is five claims, each backed by a part of the spec:
+
+| Claim | Meaning | Spec |
+|---|---|---|
+| **agent generates and manages** | the UI is code an LLM/agent wrote and can keep editing — treated as untrusted by construction | §5, §8 |
+| **standard OIDC/OAuth** | viewers sign in with ordinary authorization-code + PKCE against the platform IdP — no invented auth | §3 |
+| **secure, scoped** | the page acts only within an explicit grant (declared or requested at runtime), only as its owner, via a short-lived token — never a real credential | §4, §5.4, §6 |
+| **internet relay** | the files stay on the author's machine; a hub relays each request over the host agent's one authenticated WebSocket — nothing is uploaded or deployed | §7 |
+| **web + API service** | the result is both a served page *and* a governed data plane to backend APIs, addressed as service + path | §6 |
+
 Modern applications increasingly want to *generate* a UI on demand (often with an LLM/
 agent) and serve it to a user. The moment a UI is generated rather than hand-reviewed, it
 is untrusted code — and serving untrusted code with ambient access to a user's backend is
@@ -16,6 +30,25 @@ where a page can act only within its declared grant and only as the viewer.
 🎨 **[UI Design Guide → GUIDE.md](GUIDE.md)** — how to build a UI on this model: page
 anatomy (identity badge, live access panel, token state), auth from the page's
 perspective, the scope request lifecycle, and an annotated tour of the example.
+
+## Try it — the demo
+
+The [`sdk/`](sdk/) is runnable straight from a clone (Node 18+, zero dependencies):
+
+```bash
+mkdir my-app && cd my-app
+node <clone>/sdk/lmui.js init my-app        # scaffold: config + example page + page SDK
+export LMUI_GATEWAY=https://ui.example.com  # your gateway origin
+node <clone>/sdk/lmui.js login              # paste your session cookie (stored 0600)
+node <clone>/sdk/lmui.js register           # owner-bound registry entry
+node <clone>/sdk/lmui.js start              # serve in the background (stop/status too)
+```
+
+Open `https://ui-my-app.<domain>/` — the page is served from your machine through the
+hub, with an identity badge, a live ①declared/②runtime-granted access panel, and
+buttons that walk the whole grant lifecycle: call a declared path, get refused on an
+undeclared one, request access (granted instantly — you own the UI), use it, give it
+back. [GUIDE.md §5](GUIDE.md) annotates every region of the page.
 
 ## What it covers
 
