@@ -35,6 +35,10 @@ where a page can act only within its declared grant and only as the viewer.
 anatomy (identity badge, live access panel, token state), auth from the page's
 perspective, the scope request lifecycle, and an annotated tour of the example.
 
+🚀 **[Bootstrap Guide → BOOTSTRAP.md](BOOTSTRAP.md)** — zero to served: what the platform
+operator sets up once, the author's five-minute path, per-hop troubleshooting, and the
+list of steps that deliberately don't exist.
+
 🧰 **[Reference SDK → sdk/](sdk/README.md)** — not an optional extra: the CLI
 (`init`/`login`/`register`/`dev`/`start`/`stop`/`status`), the page runtime
 (`lmui.call`, request/release, re-mint), and the canonical example UI. Zero
