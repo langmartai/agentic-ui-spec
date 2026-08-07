@@ -135,3 +135,14 @@ lmui.token, lmui.uiId
 ```
 
 It never sees a backend credential — only a short-lived, grant-bearing view token.
+
+## Sibling apps — one host port, many UIs
+
+The hub routes ALL of a host's `/ui-*` traffic to one port, so a second UI on the same
+machine could never be reached on a port of its own. The dev server therefore serves
+**sibling apps** as well as its own: a request for `/ui-<other>/…` is answered from
+`<appsRoot>/<other>/` when that directory contains an `lmui.config.json`. The apps root
+defaults to `~/.lmui/apps` (override with `LMUI_APPS_DIR`); the cwd app always wins for
+its own service prefix. Practically: keep every UI for a host under the apps root, run
+ONE `lmui start` there on the host's UI port, and each registered sibling is served —
+`pages` is reserved (the host agent's own management API lives at `/ui-pages`).

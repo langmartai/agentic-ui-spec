@@ -120,14 +120,29 @@ cmds.dev = () => {
   const port = Number(process.env.PORT || cfg.dev?.port || 5173);
   const service = cfg.service || `ui-${cfg.uiId}`;
   const dir = process.cwd();
+  // Sibling apps: one host port serves EVERY app under the apps root (default
+  // ~/.lmui/apps, override LMUI_APPS_DIR). The hub routes all /ui-* traffic to one
+  // port per host, so without this a second UI on the same machine would need a port
+  // it can never be reached on. A request for /ui-<other>/ is served from
+  // <appsRoot>/<other>/ when that directory exists; the cwd app keeps priority.
+  const appsRoot = process.env.LMUI_APPS_DIR || path.join(os.homedir(), '.lmui', 'apps');
   http.createServer((req, res) => {
     let rel = decodeURIComponent((req.url || '/').split('?')[0]);
+    let base = dir;
     // The relay may prefix the service route; strip it so the same server works either way.
-    if (rel === `/${service}` || rel.startsWith(`/${service}/`)) rel = rel.slice(service.length + 1) || '/';
+    if (rel === `/${service}` || rel.startsWith(`/${service}/`)) {
+      rel = rel.slice(service.length + 1) || '/';
+    } else {
+      const m = rel.match(/^\/ui-([a-z0-9][a-z0-9-]*)(\/.*)?$/);
+      if (m && m[1] !== 'pages') {
+        const sibling = path.join(appsRoot, m[1]);
+        if (fs.existsSync(path.join(sibling, 'lmui.config.json'))) { base = sibling; rel = m[2] || '/'; }
+      }
+    }
     if (rel === '/' || rel === '') rel = '/index.html';
     if (rel.includes('..')) return res.writeHead(403).end('forbidden');
-    const full = path.resolve(dir, '.' + rel);
-    if (!full.startsWith(path.resolve(dir) + path.sep)) return res.writeHead(403).end('forbidden');
+    const full = path.resolve(base, '.' + rel);
+    if (!full.startsWith(path.resolve(base) + path.sep)) return res.writeHead(403).end('forbidden');
     fs.readFile(full, (err, body) => {
       if (err) return res.writeHead(404).end('not found');
       if (body.length > MAX_ASSET) {
