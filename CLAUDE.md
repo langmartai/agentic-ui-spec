@@ -57,6 +57,10 @@ server (SPEC §7). `PORT=<n>` overrides the port for dev/start/status alike.
    aud-bound, and carry the grant; credentials stay server-side.
 5. **Grants are explicit** — declared at registration or requested at runtime; an owner's
    request to their own UI grants immediately (requester = granter, nothing to approve).
+6. **Identity is owner-qualified** (SPEC 2.7–2.10) — a `uiId` is unique per owner; the
+   globally unique key is `uiKey` = `<ownerSlug>-<uiId>`, which is the serving origin
+   (`ui-<uiKey>.<domain>`), the view token's `aud`, and the key consent is recorded
+   against. Authors write the bare `uiId`; never re-introduce it as a global name.
 
 If a change would violate one of these, the change is wrong or the spec needs a new
 versioned section arguing why — never a silent edit.

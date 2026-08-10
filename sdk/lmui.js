@@ -65,7 +65,10 @@ const cmds = {};
 
 cmds.init = (uiId) => {
   if (!uiId) die('usage: init <uiId>   (lowercase letters, digits, hyphens)');
-  if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(uiId)) die(`"${uiId}" is not a valid uiId: 2-63 chars of [a-z0-9-], starting alphanumeric`);
+  // 51, not 63: the served origin is ui-<ownerSlug>-<uiId>.<domain>, and "ui-" plus the
+  // 8-char owner slug plus its hyphen must still leave the whole thing inside one 63-char
+  // DNS label — which is what keeps ONE wildcard certificate covering every UI (SPEC §2.8).
+  if (!/^[a-z0-9][a-z0-9-]{1,50}$/.test(uiId)) die(`"${uiId}" is not a valid uiId: 2-51 chars of [a-z0-9-], starting alphanumeric`);
   if (fs.existsSync(CFG_FILE)) die(`${CFG_FILE} already exists here`);
 
   // The declared grant is deliberately minimal: everything else is requested at runtime.
@@ -103,16 +106,22 @@ cmds.login = async () => {
 cmds.register = async () => {
   const cfg = loadCfg();
   const body = {
+    // The BARE uiId is what an author declares. It only has to be unique among YOUR UIs —
+    // the gateway qualifies it with your owner slug into the uiKey it addresses (SPEC §2.9).
     uiId: cfg.uiId, name: cfg.name, scope: cfg.scope, access: 'owner', grant: cfg.grant,
     source: 'worker', workerId: cfg.workerId || process.env.LMUI_WORKER_ID, service: cfg.service || `ui-${cfg.uiId}`,
   };
   if (!body.workerId) die('no workerId — set it in lmui.config.json or LMUI_WORKER_ID (the host that will serve this UI)');
-  await api('POST', '/registry/uis', body);
-  console.log(`registered ${cfg.uiId}
+  const d = await api('POST', '/registry/uis', body);
+  // Use the origin the gateway returned; never assemble a hostname here. How a uiKey
+  // composes into an origin belongs to the implementation and may change (SPEC §2.9).
+  const uiKey = d.uiKey || d.ui?.uiKey;
+  const origin = d.origin || d.ui?.origin;
+  console.log(`registered ${cfg.uiId}${uiKey ? `  (uiKey ${uiKey})` : ''}
   scope    ${cfg.scope}
   grant    ${cfg.grant.map((g) => `${g.service}:${g.pathPrefix} [${g.verbs.join(',')}]`).join('  ')}
   hosted   ${body.workerId} → service "${body.service}"
-  open     ${gateway().replace('//', '//' + (process.env.LMUI_APP_PREFIX || 'ui-') + cfg.uiId + '.').replace(/^https:\/\/ui-/, 'https://ui-')}`);
+  open     ${origin || '(no origin in the registry response — ask your gateway for it)'}`);
 };
 
 cmds.dev = () => {
@@ -125,6 +134,9 @@ cmds.dev = () => {
   // port per host, so without this a second UI on the same machine would need a port
   // it can never be reached on. A request for /ui-<other>/ is served from
   // <appsRoot>/<other>/ when that directory exists; the cwd app keeps priority.
+  // These local routes use the BARE uiId, not the owner-qualified uiKey: the hub has
+  // already routed to this owner's host (SPEC §7.2), so within the machine a bare id is
+  // unambiguous — and the author never has to type a slug they did not choose.
   const appsRoot = process.env.LMUI_APPS_DIR || path.join(os.homedir(), '.lmui', 'apps');
   http.createServer((req, res) => {
     let rel = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -262,7 +274,9 @@ cmds.release = async (svc, prefix) => {
 cmds.list = async () => {
   const d = await api('GET', '/registry/uis');
   if (!d.uis?.length) return console.log('no UIs registered (you only ever see your own)');
-  for (const u of d.uis) console.log(`  ${u.uiId}  scope=${u.scope}  ${u.enabled ? 'enabled' : 'disabled'}`);
+  // Show the bare uiId — the name its author chose (SPEC §2.10) — and the gateway's own
+  // origin string next to it, rather than a hostname reassembled here.
+  for (const u of d.uis) console.log(`  ${u.uiId}  scope=${u.scope}  ${u.enabled ? 'enabled' : 'disabled'}${u.origin ? `  ${u.origin}` : ''}`);
 };
 
 // ── helpers ───────────────────────────────────────────────────────────────────────────

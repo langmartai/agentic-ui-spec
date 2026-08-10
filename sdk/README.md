@@ -17,7 +17,7 @@ node /path/to/sdk/lmui.js dev
 |---|---|
 | `init <uiId>` | scaffold `lmui.config.json`, `index.html`, `assets/lmui.js` |
 | `login` | store a gateway session (written `0600`) |
-| `register` | create/update the registry entry — always owner-only |
+| `register` | create/update the registry entry — always owner-only; prints the origin the gateway allocated |
 | `dev` | serve this folder for the hub to relay |
 | `scopes` | what the UI declares, what it was granted, what it may ask for |
 | `release [service path]` | give back granted access — all, or one rule |
@@ -37,7 +37,8 @@ loopback, holding no credential of any kind. The hub connection belongs to the *
 agent** — the long-running process on your machine that already maintains one
 authenticated outbound WebSocket to the hub (in the reference implementation, the
 lm-assist Core). The agent declares a service route mapping the relayed path prefix
-`/ui-<uiId>/` to lmui's local port:
+`/ui-<uiId>/` — the bare id, because by then the hub has already routed to *your* host — to
+lmui's local port:
 
 ```
 browser ── serving gateway ── hub ══ WebSocket ══ host agent ──► http://127.0.0.1:<port>
@@ -55,6 +56,10 @@ This split is deliberate, not an implementation accident:
   now its server) never holds a backend credential.
 - **`register` names the host, not a socket.** The registry entry's `workerId` says which
   agent's WebSocket serves this UI; the hub routes by that, per SPEC §7.2.
+- **Two identifiers, one per side of the relay.** The public origin is owner-qualified
+  (`ui-<ownerSlug>-<uiId>.<domain>`) because that is where every owner's UIs share a
+  namespace; everything on your machine — the service route, the apps directory, the state
+  files — uses the bare uiId, since subject-routing already got the request to you.
 
 Concretely, with lm-assist as the host agent: set the UI port once in its hub config
 (`uiWebPort` in `~/.lm-assist/hub.json`) and restart the Core; it then advertises the
@@ -116,11 +121,18 @@ Any supervisor — the host agent itself, or an external tool in its own repo �
 Access comes from exactly two places: what you **declare** here, and what you **request at
 runtime** (`lmui.requestAccess`) and can **release** (`lmui.releaseAccess`). Nothing else.
 
+`uiId` is the bare name, up to 51 characters, and it only has to be unique among *your*
+UIs — the gateway prefixes it with your owner slug when it addresses the app (SPEC §2.7).
+Never write the slug here; you do not choose it, and it may be re-derived.
+
 ## Your UI is yours alone
 
 A UI is bound to the identity that registered it and is served only to that identity —
-another user cannot open it, or even see it listed (SPEC §5.4). If someone else wants it,
-they register their own copy under their own identity, against their own data.
+another user cannot open it, or even see it listed (SPEC §5.4). The name is yours too, in
+the sense that matters: `dashboard` is unique inside your namespace, so registering it
+neither takes it from anyone nor can be taken from you. If someone else wants your app,
+they register their own copy under their own identity, against their own data — under the
+same name if they like, on their own origin.
 
 ## Browser runtime
 
@@ -131,8 +143,11 @@ lmui.call(service, path, opts)   // fetch with the view token; re-mints on 401/4
 lmui.requestAccess(rules, why)   // ask for more; granted or returns a consent URL
 lmui.releaseAccess(service, path)// give it back
 lmui.scopes()                    // what exists and what this UI holds
-lmui.token, lmui.uiId
+lmui.token, lmui.uiId, lmui.uiKey
 ```
+
+`uiId` is the bare name to show a viewer; `uiKey` is `<ownerSlug>-<uiId>`, the token's
+`aud`. Gateway calls take either, so the helper passes the bare id.
 
 It never sees a backend credential — only a short-lived, grant-bearing view token.
 

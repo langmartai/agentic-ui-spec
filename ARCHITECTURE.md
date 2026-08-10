@@ -153,7 +153,7 @@ sequenceDiagram
 
   Note over AG: ONE authenticated reverse WebSocket per HOST,<br/>held by the agent — never by the UI server
   B->>SG: GET / (session cookie)
-  SG->>SG: owner check → this UI's registry entry names its host (workerId)
+  SG->>SG: Host header → uiKey → registry entry (owner + host workerId)
   SG->>HUB: fetch /ui-<uiId>/index.html for that host
   HUB->>AG: forward over the host's reverse-dial channel
   AG->>LS: HTTP to 127.0.0.1:<port> (declared /ui-* service route)
@@ -163,6 +163,12 @@ sequenceDiagram
   SG->>SG: inject view token (document requests only)
   SG-->>B: the page — served from the author's machine
 ```
+
+Note which identifier appears on which hop. The public origin is owner-qualified (the
+`uiKey`, below), because the internet side is where every owner's UIs meet. The relayed path
+is the bare `uiId`, because the hub has already routed the request to that owner's own host
+(SPEC §7.2) — inside one owner's machine a bare id is unambiguous, and it keeps the author's
+local layout, service route, and directory names free of an owner prefix they never typed.
 
 Properties this topology fixes (SPEC §7.5):
 
@@ -188,22 +194,25 @@ author's host agent is their own **lm-assist** node:
 ```mermaid
 flowchart LR
   subgraph W["*.langmart.ai — ONE pre-allocated wildcard (DNS + TLS)"]
-    A1["ui-alices-app.langmart.ai"]
-    B1["ui-bobs-app.langmart.ai"]
+    A1["ui-3f9a2b1c-dashboard.langmart.ai"]
+    B1["ui-c07d41e8-dashboard.langmart.ai"]
   end
   subgraph GW["langmart.ai UI gateway (Serving Gateway + registry)"]
-    RA["uiId: alices-app<br/>owner: Alice · host: Alice's lm-assist"]
-    RB["uiId: bobs-app<br/>owner: Bob · host: Bob's lm-assist"]
+    RA["uiKey: 3f9a2b1c-dashboard<br/>uiId: dashboard · owner: Alice<br/>host: Alice's lm-assist"]
+    RB["uiKey: c07d41e8-dashboard<br/>uiId: dashboard · owner: Bob<br/>host: Bob's lm-assist"]
   end
   HA["Alice's machine<br/>(lm-assist Core + lmui)"]
   HB["Bob's machine<br/>(lm-assist Core + lmui)"]
-  A1 -->|Host header → uiId| RA -->|"relay via langmart.ai hub,<br/>subject-routed (§7.2)"| HA
-  B1 -->|Host header → uiId| RB -->|"relay via langmart.ai hub,<br/>subject-routed (§7.2)"| HB
+  A1 -->|Host header → uiKey| RA -->|"relay via langmart.ai hub,<br/>subject-routed (§7.2)"| HA
+  B1 -->|Host header → uiKey| RB -->|"relay via langmart.ai hub,<br/>subject-routed (§7.2)"| HB
 ```
 
-- **Claiming a name = registering it.** The registry's uiId is unique first-come
-  (reserved names denylisted); from that moment `ui-<uiId>.<domain>` routes, because the
-  gateway resolves the Host header to the uiId per request — no per-app DNS, cert,
+Alice and Bob both called their app `dashboard`, and neither had to know the other existed.
+That is the point of the addressing scheme below.
+
+- **Claiming a name = registering it, inside your own namespace.** A uiId is unique per
+  owner, not globally; from registration `ui-<ownerSlug>-<uiId>.<domain>` routes, because
+  the gateway resolves the Host header to a uiKey per request — no per-app DNS, cert,
   proxy rule, or config file exists to create or clean up.
 - **Three independent isolation walls.** (1) *Owner-only serving*: a viewer who is not
   the owner gets a no-access page naming their identity — the UI never renders.
@@ -213,6 +222,49 @@ flowchart LR
   identity and grant; backend calls execute as that viewer, never as the platform.
 - **Failure isolation follows ownership.** Alice's host being offline 503s exactly
   Alice's UIs; Bob's are untouched. Availability, like the files, belongs to the author.
+
+### Owner-qualified origins — the uiKey (SPEC §2.7–§2.10)
+
+The origin used to be `ui-<uiId>.<domain>`: the bare name an author chose, addressed
+directly. That made the uiId a global name, and three things followed from it that the
+owner prefix now removes.
+
+**A name could be taken.** The registry's key was the bare uiId, so the first person to
+register `dashboard` held it against everyone else and the second registration was simply
+refused. Nothing about one user's app justified excluding another's; the collision was an
+artifact of the addressing, not a real conflict. The uiId is now unique per owner, and the
+uiKey — `<ownerSlug>-<uiId>` — is what is globally unique.
+
+**Consent followed the name rather than the party.** Runtime access grants were keyed on the
+bare uiId too. Had a name ever been released and re-registered by someone else, the new
+registrant would have inherited every user's prior consent to the old one. Keying on the
+uiKey makes that impossible, because the key names the owner.
+
+**The audience check would have stopped identifying a UI.** This is the security-critical
+one, and it is why the qualification cannot stop at the registry. A view token's `aud` is
+the uiKey (SPEC §4.3). If it were the bare uiId, then the moment two owners can each have a
+`dashboard`, a token minted for one owner's page would validate on the other owner's origin
+— the audience would no longer distinguish the two UIs it exists to distinguish.
+
+Two details of the shape are load-bearing:
+
+- **Eight characters, fixed width.** A uiId may itself contain hyphens, so a variable-width
+  prefix leaves `a-b-c` ambiguous — there would be no way to split it back into owner and
+  uiId. At a fixed width the composite parses by position. And `ui-` + 8 + `-` + uiId still
+  fits inside one 63-character DNS label, so the existing `*.langmart.ai` wildcard
+  certificate keeps covering every app origin with no per-user certificate or DNS record.
+  The cost is a cap of 51 characters on a uiId, which is the trade this scheme accepts.
+- **A hash of the owner's identifier, not the identifier.** An origin is public and ends up
+  in browser history, logs, and shared links. Publishing a prefix of a user identifier that
+  is used elsewhere would disclose something the addressing does not need; a hash prefix
+  names the owner's namespace and says nothing about the owner. Uniqueness comes from an
+  allocation table, not from the hash's collision resistance — on a collision the gateway
+  allocates a different slug.
+
+Authors are unaffected: `lmui.config.json` and registration still declare the bare uiId, and
+the gateway applies the prefix. Registration and listing responses carry the `uiKey` and the
+full `origin`, and clients open that returned origin rather than assembling a hostname
+themselves. Anything shown to a person shows the bare uiId.
 
 ## Origins and the trust boundary (SPEC §5.3)
 

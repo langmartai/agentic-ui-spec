@@ -9,13 +9,20 @@ do; this guide says how to build a UI that people can actually trust and use. Th
 ## 1. What a pluggable UI is, from the page's point of view
 
 Your page is plain static HTML/JS/CSS served on its **own origin**
-(`ui-<uiId>.<domain>`). It arrives in the browser with two things injected by the
-serving gateway:
+(`ui-<uiKey>.<domain>`, e.g. `ui-3f9a2b1c-dashboard.example.com`). It arrives in the browser
+with these injected by the serving gateway:
 
 ```js
 window.__VIEW_TOKEN__   // short-lived signed token: who is viewing, which UI, what it may reach
-window.__UI_ID__        // this UI's id
+window.__UI_ID__        // this UI's id, as you declared it — the one to show people
+window.__UI_KEY__       // <ownerSlug>-<uiId>: the globally unique id, and the token's audience
 ```
+
+You write the bare `uiId` and only the bare `uiId` — in `lmui.config.json`, at registration,
+and in anything the page displays. The `<ownerSlug>-` prefix is addressing the gateway
+applies so that two people can both name an app `dashboard` (SPEC §2.7); it is not yours to
+type, and it means nothing to a reader. After registering, open the `origin` the gateway
+returned rather than assembling a hostname from parts.
 
 Everything else your page knows, it must ask for — same-origin only:
 
@@ -28,6 +35,10 @@ Everything else your page knows, it must ask for — same-origin only:
 | `POST /access/request` | ask for more access (rules + reason) |
 | `POST /access/revoke` | give access back |
 | `/data/<uiId>/<service>/<path>` | the data plane — every backend call goes here, bearer = view token |
+
+Where one of those paths names the UI, either form works: a bare `uiId` is resolved inside
+*your* namespace, so a guessed name can never address someone else's UI, and the full
+`uiKey` is unambiguous everywhere. The bundled SDK passes whichever the gateway injected.
 
 The page never sees an API key, a session secret, or another UI's anything. That is not a
 restriction to work around; it is the reason the model is safe enough to let anyone
@@ -80,8 +91,13 @@ on demand, its decoded contents:
 
 ```js
 const claims = JSON.parse(atob(lmui.token.split('.')[1]));
-// claims.sub = viewer, claims.aud = this uiId, claims.grant = what THIS token can do
+// claims.sub = viewer, claims.aud = this UI's uiKey, claims.grant = what THIS token can do
 ```
+
+`aud` is the **uiKey**, not the bare id: it has to name the UI globally, because a token
+minted for one owner's `dashboard` must not validate on another owner's `dashboard` origin
+(SPEC §4.3). If you surface it in a debug panel, label it as such — the identity you show a
+person is the bare `uiId`.
 
 If the decoded grant differs from the server's view, tell the user it is stale and that
 any data call (or an explicit re-mint) will refresh it.
@@ -160,7 +176,7 @@ await lmui.releaseAccess('platform', '/api/user/quota/status');
 | "Call my declared grant" | ① — works with no request, because the config declared it |
 | "Ask for more access" | ② request → instant grant (own UI) → immediate use |
 | "Give it back" | ② release → panel shrinks → the same call 403s again |
-| "Show current scope" | §2.3 — decodes the live token: viewer, aud, carried grant |
+| "Show current scope" | §2.3 — decodes the live token: viewer, aud (the uiKey), carried grant |
 | Output console (`#out`) | raw HTTP status + body for every action — honesty beats polish |
 
 **`assets/lmui.js`** — the page-side SDK (~90 lines, no dependencies):

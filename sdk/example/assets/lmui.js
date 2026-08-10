@@ -5,7 +5,11 @@
 (function () {
   'use strict';
   var token = window.__VIEW_TOKEN__;
-  var uiId = window.__UI_ID__;
+  var uiId = window.__UI_ID__;              // the bare id you declared — show this to people
+  // The globally unique key, <ownerSlug>-<uiId>, and the audience of every view token.
+  // Gateway APIs accept either form (a bare id resolves inside your own namespace), so the
+  // calls below keep using uiId; uiKey is exposed for pages that compare against aud.
+  var uiKey = window.__UI_KEY__ || uiId;
 
   async function remint() {
     var r = await fetch('/viewtoken/remint', {
@@ -83,6 +87,6 @@
   window.lmui = {
     call: call, remint: remint, requestAccess: requestAccess, approvedGrants: approvedGrants,
     scopes: scopes, releaseAccess: releaseAccess,
-    uiId: uiId, get token() { return token; },
+    uiId: uiId, uiKey: uiKey, get token() { return token; },
   };
 })();

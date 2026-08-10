@@ -1,4 +1,4 @@
-# Agentic UI Specification — AUIS v0.1
+# Agentic UI Specification — AUIS v0.2
 
 Status: draft. Requirement language: MUST / MUST NOT / SHOULD / MAY per RFC 2119.
 
@@ -59,9 +59,9 @@ at registration, so a nonconforming entry cannot exist, not merely cannot act.
 2.3. A scope MAY have multiple serving tiers (e.g. an internet-facing hub tier and a
 local/LAN tier); both serve the same registry entries under the same contracts.
 
-2.4. A registry entry MUST carry at minimum: `uiId` (unique in scope), `name`, artifact
-location, `ownerUserId` (the OIDC `sub` it is bound to — see §5.4), `enabled`, and the
-`grant` (§4).
+2.4. A registry entry MUST carry at minimum: `uiId` (unique per owner within the scope —
+§2.7), `name`, artifact location, `ownerUserId` (the OIDC `sub` it is bound to — see §5.4),
+`enabled`, and the `grant` (§4).
 
 2.5. Registration MUST be authenticated and MUST bind `ownerUserId` to the authenticated
 subject. A caller MUST NOT register or mutate another owner's entry.
@@ -69,6 +69,47 @@ subject. A caller MUST NOT register or mutate another owner's entry.
 2.6. Grant breadth MUST be validated at registration: a prefix that matches every path
 (e.g. `/`) MUST be rejected; a service outside the scope MUST be rejected (2.2); verbs
 MUST be a subset of a known method set.
+
+2.7. **A uiId is a name inside its owner's namespace, not a global name.** A registry MUST
+NOT make the bare `uiId` its primary key: doing so lets whoever registers `dashboard` first
+take that name away from everyone else, and makes every later registration of it a
+first-come collision rather than a private choice. The globally unique identity of a UI is
+its **uiKey**, and the serving origin is derived from that:
+
+```
+uiKey  = <ownerSlug>-<uiId>
+origin = ui-<uiKey>.<domain>          e.g. ui-3f9a2b1c-dashboard.example.com
+```
+
+`ownerSlug` MUST be exactly 8 hexadecimal characters identifying the UI's owner, and MUST
+be *derived from* the owner's identifier rather than being a prefix of it. An origin is
+public; publishing part of an identifier that is used elsewhere is a disclosure the
+addressing scheme does not need. A hash prefix names the owner's namespace without saying
+anything about the owner. Uniqueness MUST rest on an allocation record, not on the hash's
+collision resistance: on a collision the implementation MUST allocate a different slug
+rather than let two owners share one.
+
+The width is fixed because a `uiId` may itself contain hyphens. With a variable-width
+prefix, `a-b-c` could not be split back into owner and uiId unambiguously; at a fixed width
+the composite parses by position.
+
+2.8. **An app origin MUST occupy a single DNS label.** `ui-` + 8 + `-` + `uiId` MUST fit
+within the 63-character limit of one label, which caps a `uiId` at **51 characters**; a
+registry MUST reject a longer one. This is what keeps one pre-allocated `*.<domain>`
+wildcard certificate covering every app origin in a deployment — no per-owner or per-UI
+certificate, DNS record, or proxy rule is ever issued.
+
+2.9. **Bare ids in, qualified ids out.** UI configuration and registration MUST declare the
+bare `uiId`; the owner prefix is addressing applied by the implementation, not something an
+author writes. An API that names a UI in a path or body MUST accept either form, and MUST
+resolve a bare `uiId` only within the calling subject's own namespace — so a guessed name
+can never reach another owner's UI. Registration and listing responses MUST return the
+`uiKey` and a fully-qualified `origin`; a client MUST use the returned `origin` rather than
+assembling a hostname from parts, because how an origin is composed is the implementation's
+business and may change.
+
+2.10. Interfaces shown to humans SHOULD display the bare `uiId` (or the UI's `name`). The
+owner slug is machine addressing and is noise to a reader.
 
 ## 3. Authentication
 
@@ -110,11 +151,15 @@ serving point that never provisions is a conforming identity-only deployment.
 be segment-boundary: `/a` matches `/a` and `/a/…`, never `/ab`.
 
 4.2. A **view token** is a short-lived (≤ 15 min) signed token minted per page load,
-carrying `sub` (viewer), `aud` (the uiId), the grant, issuer, and expiry. It is the
-*only* credential a UI page ever holds.
+carrying `sub` (viewer), `aud` (the **uiKey** — §2.7, never the bare uiId), the grant,
+issuer, and expiry. It is the *only* credential a UI page ever holds.
 
 4.3. Verification MUST check signature, issuer, expiry, **and audience against the UI
-being addressed**. A token minted for one UI MUST NOT be accepted for another.
+being addressed**. The audience MUST be compared as the `uiKey`. This is the
+security-critical consequence of §2.7: once two owners may each have a UI named
+`dashboard`, a bare-uiId audience would let a token minted for one owner's page validate on
+the other owner's origin — the audience check would no longer identify a UI. A token minted
+for one UI MUST NOT be accepted for another.
 
 4.4. The serving point MUST offer authenticated re-mint (session → fresh token for a UI
 the session may load), so a UI outlives the token TTL without ever holding a long-lived
@@ -124,11 +169,17 @@ credential.
 an equivalent discriminator); a programmatic same-origin fetch of a UI's page MUST NOT
 receive a token.
 
+4.6. **Consent follows the party, not the name.** Any record of access a user has granted a
+UI at runtime MUST be keyed by `uiKey`. Keyed by the bare `uiId`, consent would attach to a
+name: were a name released and registered by someone else, the new registrant would inherit
+every grant users had made to the old one. Keyed by `uiKey`, a grant can only ever be
+exercised by the owner it was given to.
+
 ## 5. Serving
 
 5.1. A UI artifact is static — an entry document plus assets. The serving point injects
-the view token and uiId into the entry document at serve time. UIs MUST NOT require
-server-side rendering.
+the view token and the UI's identity — its `uiId` and the `uiKey` the token is addressed to
+(§2.7) — into the entry document at serve time. UIs MUST NOT require server-side rendering.
 
 5.2. Serving MUST require an authenticated session for the entry document AND its assets.
 
@@ -141,10 +192,12 @@ page to its serving origin (no external script/style/font/connect).
   credentials is not a privilege escalation. Such apps MAY use inline script/style.
 - **Untrusted or generated UIs** (agent-authored, third-party, or shared) MUST be served
   from a **dedicated origin that holds no ambient platform credential** — a separate
-  subdomain per deployment (and, for stronger isolation, per UI). They MUST NOT be served
-  from, or framed such that they can reach, an origin carrying the viewer's session cookie
-  or API keys. This origin separation — not the CSP alone — is what lets untrusted code be
-  admitted at all: on it, the only credential reachable is the short-lived view token.
+  subdomain per deployment and, for stronger isolation, per UI: one owner-qualified origin
+  each (§2.7), so that two owners' UIs of the same name never share one. They MUST NOT be
+  served from, or framed such that they can reach, an origin carrying the viewer's session
+  cookie or API keys. This origin separation — not the CSP alone — is what lets untrusted
+  code be admitted at all: on it, the only credential reachable is the short-lived view
+  token.
 
 5.4. **Access is bound to one identity: the owner's.** A UI records the OIDC `sub` that
 registered it, and MUST be loadable **only** when the authenticated subject equals that
@@ -200,10 +253,11 @@ deliberately provisioned.
 
 6.2. **The request path.** A UI reaches data ONLY through its serving point's data API,
 presenting its view token, naming a `service` and `path`. The serving point MUST, in
-order: verify the view token including `aud` (4.3); confirm the named service belongs to
-the UI's scope (2.2); check `{service, method, path}` against the grant (4.1); then
-resolve the service to a Data Source (6.4) and forward the request with the appropriate
-backend credential. A grant denial MUST name the denied `{service, path}`.
+order: verify the view token, including `aud` against the addressed UI's `uiKey` (4.3);
+confirm the named service belongs to the UI's scope (2.2); check `{service, method, path}`
+against the grant (4.1); then resolve the service to a Data Source (6.4) and forward the
+request with the appropriate backend credential. A grant denial MUST name the denied
+`{service, path}`.
 
 6.3. **Service resolution.** Each service name in a scope MUST map to (a) a Data Source
 and (b) a credential strategy. Two strategies are defined:
@@ -268,7 +322,9 @@ authoring path consistent with the no-credential rule of §8.
 
 A conforming UI MAY assume, and MUST limit itself to:
 
-- Injected globals: the view token and its uiId.
+- Injected globals: the view token, the UI's `uiId`, and the `uiKey` the token is
+  addressed to (§2.7). A UI addresses itself to its own serving point by either form (2.9)
+  and shows the bare `uiId` to its viewer (2.10).
 - A data API at its own origin taking the view token as a bearer credential, addressed as
   `service` + `path` (6.2).
 - Re-mint (4.4) on authentication expiry.

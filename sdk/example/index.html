@@ -137,7 +137,9 @@
     document.getElementById('show-scope').onclick = function () {
       try {
         var c = JSON.parse(atob(lmui.token.split('.')[1]));
-        var lines = ['CURRENT SCOPE', '  viewer: ' + c.sub, '  UI:     ' + c.aud, '', '  grant in live token:'];
+        // The chip above shows the bare uiId; aud is the uiKey, so label it as such.
+        var lines = ['CURRENT SCOPE', '  viewer: ' + c.sub, '  UI:     ' + lmui.uiId,
+                     '  aud:    ' + c.aud + '  (uiKey)', '', '  grant in live token:'];
         (c.grant || []).forEach(function (r) { lines.push('    • ' + r.service + ':' + r.pathPrefix + ' [' + r.verbs.join(',') + ']'); });
         if (!(c.grant || []).length) lines.push('    (empty)');
         out.classList.remove('err');

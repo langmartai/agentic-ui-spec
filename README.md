@@ -29,7 +29,7 @@ a security problem, not a feature. AUIS defines the roles and contracts that mak
 one identity layer, scoped registries, short-lived capability tokens, and a data plane
 where a page can act only within its declared grant and only as the viewer.
 
-📄 **[Read the specification → SPEC.md](SPEC.md)** (AUIS v0.1, RFC 2119 language)
+📄 **[Read the specification → SPEC.md](SPEC.md)** (AUIS v0.2, RFC 2119 language)
 
 🎨 **[UI Design Guide → GUIDE.md](GUIDE.md)** — how to build a UI on this model: page
 anatomy (identity badge, live access panel, token state), auth from the page's
@@ -57,8 +57,9 @@ node <clone>/sdk/lmui.js register           # owner-bound registry entry
 node <clone>/sdk/lmui.js start              # serve in the background (stop/status too)
 ```
 
-Open `https://ui-my-app.<domain>/` — the page is served from your machine through the
-hub, with an identity badge, a live ①declared/②runtime-granted access panel, and
+`register` prints the origin the gateway allocated — `https://ui-<ownerSlug>-my-app.<domain>/`.
+Open it: the page is served from your machine through the hub, with an identity badge, a
+live ①declared/②runtime-granted access panel, and
 buttons that walk the whole grant lifecycle: call a declared path, get refused on an
 undeclared one, request access (granted instantly — you own the UI), use it, give it
 back. [GUIDE.md §5](GUIDE.md) annotates every region of the page.
@@ -69,18 +70,30 @@ Every user gets this independently — there is **no per-user infrastructure ste
 
 - The platform pre-allocates **one** wildcard once — in the reference implementation,
   `*.langmart.ai`, which the platform already held. The fixed `ui-` prefix carves the
-  app namespace out of it: `ui-<uiId>.langmart.ai` resolves and has valid TLS for *any*
-  uiId, with zero DNS/cert/proxy work per app.
+  app namespace out of it: `ui-<uiKey>.langmart.ai` resolves and has valid TLS for *any*
+  UI, with zero DNS/cert/proxy work per app.
+- **An origin names the owner as well as the app.** The `uiKey` is
+  `<ownerSlug>-<uiId>`, where the owner slug is 8 hex characters derived from the owner's
+  identity — so Alice and Bob can each register `dashboard` without either taking the name
+  from the other, prior consent can never transfer with a re-used name, and the view
+  token's audience (the uiKey) still identifies exactly one UI. Fixed width keeps the
+  composite parseable when a uiId contains hyphens, and keeps the whole origin inside one
+  63-character DNS label so the single wildcard certificate still covers it; the price is a
+  51-character cap on a uiId. Authors write the bare uiId and see it everywhere — the
+  prefix is addressing, applied by the gateway (SPEC §2.7–§2.10).
 - **Registering a uiId IS the allocation.** `POST /registry/uis` (the Serving Gateway's
-  API) claims the name first-come (reserved names denylisted) and binds it to the
-  caller's identity; the gateway derives the uiId from the Host header at request time.
+  API) claims the name inside your namespace (reserved names denylisted) and binds it to
+  the caller's identity; the gateway resolves the Host header to a uiKey at request time
+  and returns the fully-qualified `origin`, which clients should use rather than building
+  a hostname themselves.
 - Isolation is three independent walls: **owner-only serving** (another account gets a
   no-access page, the UI never renders), **subject-routed relay** (SPEC §7.2 — a UI
   relays only to hosts owned by *its* owner; nobody's traffic can reach your machine),
   and a **scoped data plane** (each viewer's tokens carry their own identity and grants).
 
-Two users on the same platform are therefore fully parallel: own uiId under the shared
-wildcard, own machine (their **lm-assist** node) as the hosting, own identity end to end.
+Two users on the same platform are therefore fully parallel: own namespace of uiIds under
+the shared wildcard, own machine (their **lm-assist** node) as the hosting, own identity end
+to end.
 
 ## What it covers
 
@@ -128,8 +141,10 @@ If you implement AUIS, open a PR adding your project here.
 
 ## Status
 
-v0.1 draft — open to issues and proposals. Versioned by the `AUIS vX.Y` line at the top
-of `SPEC.md`.
+v0.2 draft — open to issues and proposals. Versioned by the `AUIS vX.Y` line at the top
+of `SPEC.md`. v0.2 makes UI identity owner-qualified: a uiId is unique per owner, the
+globally unique key and the view token's audience are the `uiKey`, and app origins are
+`ui-<uiKey>.<domain>` (§2.7–§2.10, §4.3, §4.6).
 
 ## License
 
