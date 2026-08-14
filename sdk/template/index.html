@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My app</title>
+<!-- Relative refs only: the same document may be served under different path roots
+     (a hub tier and a local tier) — a leading-slash href breaks under one of them. -->
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<!-- Everything here is a working skeleton: rename, don't reinvent. The structure is the
+     contract — header (identity), tab bar (views), main (list | detail), one primary
+     view that lands first. GUIDE.md §8 walks through it; SPEC §5.5/§8 are the rules. -->
+<header>
+  <h1>My app<span class="chip" id="uiid"></span></h1>
+  <div id="who"><span class="dot"></span><span id="who-name">…</span></div>
+</header>
+<nav class="tabs" id="tabs">
+  <button id="tab-items" class="tab on" type="button">Items</button>
+  <button id="tab-about" class="tab" type="button">About</button>
+</nav>
+<main>
+  <section class="pane pane-list">
+    <input id="q" class="q" type="text" placeholder="filter…" autocomplete="off">
+    <div id="list" class="list">loading…</div>
+    <div id="counts" class="counts"></div>
+  </section>
+
+  <section class="pane pane-detail">
+    <div id="detail" class="detail empty">Select an item on the left.</div>
+  </section>
+
+  <section class="pane pane-about" hidden>
+    <h2 class="about-h">About this page</h2>
+    <p class="about-p">Lazy view: nothing here loads until the tab is first opened.
+    Replace with settings, docs, or a secondary surface.</p>
+    <pre id="about-out" class="mono">…</pre>
+  </section>
+</main>
+<!-- The serving tier injects window.__VIEW_TOKEN__ / __UI_ID__ / __UI_KEY__ before these
+     scripts run; lmui.js captures them, app.js drives the UI. Both self-hosted (CSP). -->
+<script src="assets/lmui.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

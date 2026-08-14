@@ -63,26 +63,36 @@ async function api(method, p, body) {
 // ── commands ──────────────────────────────────────────────────────────────────────────
 const cmds = {};
 
-cmds.init = (uiId) => {
-  if (!uiId) die('usage: init <uiId>   (lowercase letters, digits, hyphens)');
+cmds.init = (uiId, flag) => {
+  if (!uiId) die('usage: init <uiId> [--app]   (lowercase letters, digits, hyphens)');
   // 51, not 63: the served origin is ui-<ownerSlug>-<uiId>.<domain>, and "ui-" plus the
   // 8-char owner slug plus its hyphen must still leave the whole thing inside one 63-char
   // DNS label — which is what keeps ONE wildcard certificate covering every UI (SPEC §2.8).
   if (!/^[a-z0-9][a-z0-9-]{1,50}$/.test(uiId)) die(`"${uiId}" is not a valid uiId: 2-51 chars of [a-z0-9-], starting alphanumeric`);
   if (fs.existsSync(CFG_FILE)) die(`${CFG_FILE} already exists here`);
 
+  // Two scaffolds: the default is the auth/grant-lifecycle DEMO page (GUIDE §5);
+  // --app is the product-page TEMPLATE (GUIDE §8) — list+detail, tabs, embed/theme/
+  // liveness wiring, the sizing pattern, and the defensive rails already in place.
+  const app = flag === '--app';
+
   // The declared grant is deliberately minimal: everything else is requested at runtime.
   saveCfg({
     uiId, name: uiId, scope: 'langmart',
     grant: [{ service: 'platform', pathPrefix: '/api/models', verbs: ['GET'] }],
     dev: { port: 5173 },
+    // Advisory placement in a host's listing (SPEC 2.11); harmless if the host ignores it.
+    ...(app ? { sortOrder: 100 } : {}),
   });
-  const tpl = path.join(__dirname, 'example');
+  const tpl = path.join(__dirname, app ? 'template' : 'example');
   fs.mkdirSync('assets', { recursive: true });
-  for (const f of ['index.html', 'assets/lmui.js']) {
+  const files = app ? ['index.html', 'assets/app.css', 'assets/app.js'] : ['index.html'];
+  for (const f of files) {
     if (!fs.existsSync(f)) fs.copyFileSync(path.join(tpl, f), f);
   }
-  console.log(`created ${CFG_FILE}, index.html, assets/lmui.js
+  // The client shim is shared by both scaffolds and lives with the example.
+  if (!fs.existsSync('assets/lmui.js')) fs.copyFileSync(path.join(__dirname, 'example', 'assets/lmui.js'), 'assets/lmui.js');
+  console.log(`created ${CFG_FILE}, ${files.join(', ')}, assets/lmui.js
 
 Your UI is yours alone: it is bound to the identity that registers it and only
 you can open it. Next:
@@ -292,7 +302,8 @@ const [, , cmd, ...args] = process.argv;
 if (!cmd || !cmds[cmd]) {
   console.log(`lmui — build a UI on your machine, served through the hub
 
-  init <uiId>        scaffold lmui.config.json + index.html + assets/lmui.js
+  init <uiId>        scaffold the demo page (auth/grant lifecycle — GUIDE §5)
+  init <uiId> --app  scaffold the app template (list+detail, tabs, embed — GUIDE §8)
   login              store a gateway session (0600)
   register           create/update the registry entry (owner-only, always)
   dev                serve this folder for the hub to relay (foreground)

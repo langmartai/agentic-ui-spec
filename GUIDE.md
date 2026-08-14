@@ -231,3 +231,23 @@ inside the page IS the panel it was given. Practice that follows:
 - Honor `theme=light` end to end: thin strokes and pastel accents tuned for a dark
   canvas usually need a darker palette on a light background — swap the palette, not
   just the background variables.
+
+## 8. The app template — from demo to product page
+
+`node lmui.js init <uiId> --app` scaffolds `sdk/template/` instead of the demo: a working
+list + detail page in the shape a real product page should keep. The demo (§5) teaches
+the *auth model*; the template is what you *ship from*. What it has that the demo
+deliberately doesn't:
+
+| Piece | Why it's in the skeleton |
+|---|---|
+| Header + tab bar + `main` (list \| detail) | The view structure: primary view lands first, its state already in the initial markup; secondary views (`About`) load lazily on first entry. |
+| Embed/theme/liveness wiring | The SPEC 5.5 UI-side obligations, done: `body.embed` restyle, `?theme=light` palette swap, the liveness postMessage on load/resize/interval. |
+| `--vh-cap` sizing (§7) | Primary regions fill the host panel; the offsets are documented where you'll recompute them. |
+| `api()` envelope normalization | Some serving tiers wrap the backend envelope in `{status,data}`, some don't — normalized once, so the page runs unchanged behind either. |
+| Latest-wins loads + the gate surface | A stale response never paints; a hard failure shows a Retry card with the server's own text; an unserved `lmui dev` preview says so instead of failing cryptically. |
+| `esc()` on every interpolation, `[hidden]{display:none!important}`, `autocomplete="off"` | Defensive rails, each earned by a real defect in a production implementation. |
+
+Replace `loadItems`/`paintList`/`paintDetail` with your surface; keep the rails. The
+scaffold works the moment it is registered — it lists whatever its declared grant
+reaches, so you see data before you've written a line.

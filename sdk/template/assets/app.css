@@ -1,0 +1,69 @@
+/* Reference pane stylesheet — every rule here earns its place; delete what you
+ * don't use, but read the 🔴 comments before removing those lines. */
+:root{
+  --bg:#0f172a;--panel:#1e293b;--panel2:#0b1220;--line:#334155;--txt:#e2e8f0;--dim:#94a3b8;
+  --blue:#3b82f6;--green:#4ade80;--red:#f87171;
+}
+/* fill the host panel: an embedding host fixes the frame to its content area and the
+   height postMessage is LIVENESS only (SPEC 5.5) — so 100vh in embed IS the panel.
+   A = chrome around your primary region standalone; B = A minus what the embed hides
+   (this skeleton: the header ~3.2rem and main-padding ~1.2rem). Recompute from your
+   real markup when you add rows above the region; ~1rem generous, never tight. */
+:root{--vh-cap:calc(100vh - 12.5rem)}
+body.embed{--vh-cap:calc(100vh - 8.1rem)}
+*{box-sizing:border-box}
+/* 🔴 The hidden ATTRIBUTE must beat any class display — an author display:flex otherwise
+   silently wins over the UA's [hidden] rule, and an overlay that "hides" but keeps
+   eating pointer events is exactly how that failure presents. */
+[hidden]{display:none!important}
+body{font-family:system-ui,sans-serif;margin:0;background:var(--bg);color:var(--txt)}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:.7rem 1.1rem;background:var(--panel2);border-bottom:1px solid var(--line)}
+header h1{font-size:1rem;margin:0;font-weight:600}
+.chip{font-family:ui-monospace,monospace;font-size:.7rem;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:.12rem .55rem;margin-left:.45rem;color:var(--dim)}
+#who{display:flex;align-items:center;gap:.4rem;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:.25rem .7rem;font-size:.8rem}
+#who .dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--green)}
+
+.tabs{display:flex;gap:.4rem;max-width:70rem;margin:0 auto;padding:.8rem 1rem 0}
+.tab{background:var(--panel);border:1px solid var(--line);color:var(--dim);border-radius:999px;padding:.3rem .9rem;font-size:.78rem;cursor:pointer}
+.tab.on{background:var(--blue);border-color:var(--blue);color:#fff}
+
+main{display:grid;grid-template-columns:22rem minmax(0,1fr);gap:1rem;padding:1rem;align-items:start;max-width:70rem;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.9rem 1rem;min-width:0}
+.pane-about{grid-column:1 / -1}
+
+.q{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:7px;color:var(--txt);padding:.4rem .6rem;font-size:.82rem;margin-bottom:.6rem}
+/* primary region: viewport-filling cap, but short content stays compact */
+.list{display:flex;flex-direction:column;gap:.3rem;max-height:max(var(--vh-cap),16rem);overflow:auto}
+.row{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:.45rem .6rem;cursor:pointer;font-size:.84rem;word-break:break-word}
+.row:hover{border-color:var(--blue)}
+.row.sel{border-color:var(--blue);box-shadow:inset 0 0 0 1px var(--blue)}
+.counts{margin-top:.55rem;font-size:.72rem;color:var(--dim)}
+
+.detail.empty{color:var(--dim);font-size:.85rem}
+.detail h2{font-size:1.02rem;margin:0 0 .5rem;word-break:break-word}
+.mono{font-family:ui-monospace,monospace;font-size:.76rem;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:.6rem .75rem;white-space:pre-wrap;word-break:break-word;max-height:max(var(--vh-cap),16rem);overflow:auto;margin:0}
+.about-h{font-size:.9rem;margin:0 0 .4rem}
+.about-p{font-size:.82rem;color:var(--dim);margin:0 0 .7rem}
+
+/* full-screen state: a hard failure of the primary call, or the unserved preview */
+.gate{position:fixed;inset:0;background:rgba(2,6,23,.92);display:flex;align-items:center;justify-content:center;padding:1.5rem;z-index:50}
+.gate-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1.3rem 1.5rem;max-width:40rem;width:100%}
+.gate-card.err{border-color:var(--red)}
+.gate-h{font-size:1rem;font-weight:600;margin-bottom:.6rem}
+.gate-card.err .gate-h{color:var(--red)}
+.gate-msg{font-family:ui-monospace,monospace;font-size:.78rem;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:.7rem .85rem;white-space:pre-wrap;word-break:break-word;max-height:14rem;overflow:auto;margin:0 0 .9rem}
+button.primary{border:0;border-radius:7px;padding:.42rem .8rem;font-size:.78rem;cursor:pointer;background:var(--blue);color:#fff}
+
+/* ── embedded in a host (SPEC 5.5): drop own chrome; the host provides it ── */
+body.embed{background:transparent;overflow:auto}  /* 🔴 auto, NEVER hidden — a host-sized
+   frame + overflow:hidden makes everything past one viewport unreachable */
+body.embed header{display:none}
+body.embed .tabs{margin:0;padding:.4rem .4rem 0;max-width:none}
+body.embed main{margin:0;padding:.4rem;max-width:none}
+
+/* ── light theme (host passes ?theme=light) — swap the PALETTE, not just the bg ── */
+body.theme-light{--bg:#ffffff;--panel:#f8fafc;--panel2:#f1f5f9;--line:#e2e8f0;--txt:#0f172a;--dim:#64748b;--red:#b91c1c}
+body.theme-light .tab{background:#fff}
+body.theme-light .tab.on{background:var(--blue);color:#fff}

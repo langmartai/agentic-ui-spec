@@ -50,7 +50,8 @@ The [`sdk/`](sdk/) is runnable straight from a clone (Node 18+, zero dependencie
 
 ```bash
 mkdir my-app && cd my-app
-node <clone>/sdk/lmui.js init my-app        # scaffold: config + example page + page SDK
+node <clone>/sdk/lmui.js init my-app        # scaffold: config + demo page + page SDK
+node <clone>/sdk/lmui.js init my-app --app  # or the product-page template (GUIDE §8)
 export LMUI_GATEWAY=https://ui.example.com  # your gateway origin
 node <clone>/sdk/lmui.js login              # paste your session cookie (stored 0600)
 node <clone>/sdk/lmui.js register           # owner-bound registry entry
