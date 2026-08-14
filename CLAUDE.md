@@ -27,6 +27,7 @@ Before every commit, audit the diff for the above. Implementations may be *named
 | `README.md` | Front door | Links the above; keep short |
 | `sdk/lmui.js` | Reference CLI (init/login/register/dev/start/stop/status/scopes/release/list) | Node 18+, **zero dependencies**, runnable straight from a clone — never add a package.json step |
 | `sdk/example/` | The canonical example UI (`index.html` + `assets/lmui.js`) | GUIDE §5 documents it region by region — change one, update the other |
+| `sdk/template/` | The product-page template (`init --app`): list+detail skeleton with the SPEC 5.5 embed/theme/liveness wiring, sizing pattern, and defensive rails | GUIDE §8 documents it — change one, update the other; keep it a WORKING page (renders data from the default declared grant) |
 | `sdk/README.md` | SDK usage | Mirrors the CLI's actual behavior |
 
 ## How the pieces are used
