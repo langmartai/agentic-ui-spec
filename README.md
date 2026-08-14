@@ -29,7 +29,7 @@ a security problem, not a feature. AUIS defines the roles and contracts that mak
 one identity layer, scoped registries, short-lived capability tokens, and a data plane
 where a page can act only within its declared grant and only as the viewer.
 
-📄 **[Read the specification → SPEC.md](SPEC.md)** (AUIS v0.2, RFC 2119 language)
+📄 **[Read the specification → SPEC.md](SPEC.md)** (AUIS v0.3, RFC 2119 language)
 
 🎨 **[UI Design Guide → GUIDE.md](GUIDE.md)** — how to build a UI on this model: page
 anatomy (identity badge, live access panel, token state), auth from the page's
@@ -141,8 +141,10 @@ If you implement AUIS, open a PR adding your project here.
 
 ## Status
 
-v0.2 draft — open to issues and proposals. Versioned by the `AUIS vX.Y` line at the top
-of `SPEC.md`. v0.2 makes UI identity owner-qualified: a uiId is unique per owner, the
+v0.3 draft — open to issues and proposals. Versioned by the `AUIS vX.Y` line at the top
+of `SPEC.md`. v0.3 adds the embedding contract (host-sized frames, liveness-only height
+reporting — 5.5) and advisory presentation metadata (`category`/`sortOrder` — 2.11).
+v0.2 made UI identity owner-qualified: a uiId is unique per owner, the
 globally unique key and the view token's audience are the `uiKey`, and app origins are
 `ui-<uiKey>.<domain>` (§2.7–§2.10, §4.3, §4.6).
 

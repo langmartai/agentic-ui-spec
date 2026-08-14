@@ -1,4 +1,4 @@
-# Agentic UI Specification — AUIS v0.2
+# Agentic UI Specification — AUIS v0.3
 
 Status: draft. Requirement language: MUST / MUST NOT / SHOULD / MAY per RFC 2119.
 
@@ -110,6 +110,14 @@ business and may change.
 
 2.10. Interfaces shown to humans SHOULD display the bare `uiId` (or the UI's `name`). The
 owner slug is machine addressing and is noise to a reader.
+
+2.11. **Presentation metadata.** A registry entry MAY carry `category` (string) and
+`sortOrder` (integer, default 100). A host that lists UIs (a launcher, sidebar, catalog)
+SHOULD order entries by the total order (`sortOrder`, `name`, `uiKey`) — the tiebreakers
+make the listing deterministic — SHOULD group by `category` with each group positioned
+where its first member falls in that order, and SHOULD place entries without a category
+under a generic heading rather than inventing one. These fields are advisory presentation
+data: they MUST NOT affect serving, grants, or access decisions.
 
 ## 3. Authentication
 
@@ -225,6 +233,17 @@ self-describing, expiring, revocable capability tokens **and** an origin that ca
 ambient credential (§5.3) — because a share link reintroduces exactly the author ≠ viewer
 condition this clause removes.
 
+5.5. **Embedded serving.** A host MAY embed a UI's document in a frame, passing
+`embed=1` (and optionally `theme=light|dark`) as query parameters; the UI restyles for
+the chrome-less container. The host MUST size the frame itself — RECOMMENDED: fix it to
+the full content area the host allots — and MUST NOT size the frame from UI-reported
+dimensions: a full-height UI can only echo back whatever height it was given, so
+sizing-from-content is circular. An embedded UI SHOULD post a liveness message to its
+parent (e.g. `{type:'lmui:height', uiId, height}` via `postMessage`); the host MAY use
+it to detect a dead or stalled UI and MUST treat it as advisory. Inside the frame the
+viewport IS the allotted area — the UI MUST keep all of its content reachable by its own
+internal scrolling and MUST NOT assume the host scrolls the frame.
+
 ## 6. Data plane — credentials and backend API access
 
 This is the heart of the spec: how a served UI reaches backend APIs and data, and which
@@ -328,6 +347,8 @@ A conforming UI MAY assume, and MUST limit itself to:
 - A data API at its own origin taking the view token as a bearer credential, addressed as
   `service` + `path` (6.2).
 - Re-mint (4.4) on authentication expiry.
+- Embedded rendering (5.5): honor the `embed`/`theme` query parameters, post the
+  liveness message, size to its own viewport, and scroll internally.
 - Nothing else: no cross-origin fetch, no ambient cookies for data, no server-side code,
   no knowledge of any backend credential.
 

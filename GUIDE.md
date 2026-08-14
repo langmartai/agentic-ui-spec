@@ -206,3 +206,28 @@ Not requirements — conventions the example uses that have earned their place:
 - **Reload is the dev loop.** Files are served live from your machine through the hub;
   edit and reload. Hot-module reload does not survive the relay (it needs its own
   WebSocket); plain reload does.
+
+## 7. Embedding — sizing a page for a host panel
+
+When a host embeds a page (`?embed=1` — SPEC 5.5), the frame is **host-sized**: `100vh`
+inside the page IS the panel it was given. Practice that follows:
+
+- Size the primary content region(s) with one shared custom property:
+
+  ```css
+  :root{--vh-cap:calc(100vh - <A>rem)}       /* A = chrome around the region, standalone */
+  body.embed{--vh-cap:calc(100vh - <B>rem)}  /* B = A minus the chrome the embed hides  */
+  ```
+
+  Canvases take `height:var(--vh-cap)` plus a `min-height` floor; capped lists take
+  `max-height:max(var(--vh-cap), <floor>rem)` so short content stays compact. Compute
+  `A` from the page's real markup, ~1rem generous — a small gap is fine, clipping is not.
+- **Never `overflow:hidden` on the embedded body.** It was a plausible guard when hosts
+  sized frames from reported content height; against a host-sized frame it makes
+  everything past one viewport unreachable (a real board lost ~2000px this way).
+  `overflow:auto` — a page that fits exactly shows no scrollbar anyway.
+- The height message is **liveness, not layout**. Keep sending it so the host can tell a
+  dead page from a quiet one; never design around it as sizing.
+- Honor `theme=light` end to end: thin strokes and pastel accents tuned for a dark
+  canvas usually need a darker palette on a light background — swap the palette, not
+  just the background variables.
